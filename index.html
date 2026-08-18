@@ -135,32 +135,75 @@
         return data;
       },
 
-      async fetchChatMessages(limit) {
+      getUserId() { return currentUserId; },
+
+      async fetchDirectory() {
         if (!sb) return [];
-        const { data, error } = await sb
-          .from("chat_messages")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(limit || 50);
+        const { data, error } = await sb.from("leaderboard").select("user_id,name,photo");
+        if (error || !data) return [];
+        return data;
+      },
+
+      async fetchMyGroups() {
+        if (!sb) return [];
+        const memberIds = [];
+        if (currentUserId) {
+          const { data: memberRows } = await sb.from("chat_group_members").select("group_id").eq("user_id", currentUserId);
+          (memberRows || []).forEach((r) => memberIds.push(r.group_id));
+        }
+        const filter = memberIds.length ? `is_public.eq.true,id.in.(${memberIds.join(",")})` : `is_public.eq.true`;
+        const { data, error } = await sb.from("chat_groups").select("*").or(filter);
+        if (error || !data) return [];
+        return data;
+      },
+
+      async createGroup(name, memberUserIds) {
+        if (!sb || !currentUserId) throw new Error("Not signed in");
+        const { data: group, error } = await sb.from("chat_groups").insert({ name, created_by: currentUserId }).select().single();
+        if (error) throw error;
+        const rows = Array.from(new Set([currentUserId, ...memberUserIds])).map((uid) => ({ group_id: group.id, user_id: uid }));
+        const { error: mErr } = await sb.from("chat_group_members").insert(rows);
+        if (mErr) throw mErr;
+        return group;
+      },
+
+      // { groupId } for a group thread, or { recipientId } for a 1:1 DM thread.
+      async fetchMessages(target, limit) {
+        if (!sb) return [];
+        let q = sb.from("chat_messages").select("*").order("created_at", { ascending: false }).limit(limit || 50);
+        if (target.groupId) {
+          q = q.eq("group_id", target.groupId);
+        } else if (target.recipientId && currentUserId) {
+          q = q.is("group_id", null).or(
+            `and(sender_id.eq.${currentUserId},recipient_id.eq.${target.recipientId}),and(sender_id.eq.${target.recipientId},recipient_id.eq.${currentUserId})`
+          );
+        } else {
+          return [];
+        }
+        const { data, error } = await q;
         if (error || !data) return [];
         return data.reverse();
       },
 
-      async sendChatMessage(name, photo, message) {
+      async sendMessage({ groupId, recipientId, message, name, photo }) {
         if (!sb || !currentUserId) return null;
-        const { data, error } = await sb
-          .from("chat_messages")
-          .insert({ user_id: currentUserId, name: name || "Anonymous", photo: photo || null, message })
-          .select()
-          .single();
+        const row = {
+          sender_id: currentUserId,
+          sender_name: name || "Anonymous",
+          sender_photo: photo || null,
+          group_id: groupId || null,
+          recipient_id: recipientId || null,
+          message,
+        };
+        const { data, error } = await sb.from("chat_messages").insert(row).select().single();
         if (error) throw error;
         return data;
       },
 
-      subscribeToChat(onInsert) {
+      subscribeToMessages(onInsert) {
         if (!sb) return () => {};
         const channel = sb
-          .channel("chat_messages_changes")
+          .channel("chat_messages_all")
           .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages" }, (payload) => {
             onInsert(payload.new);
           })
@@ -7058,32 +7101,109 @@ function CommunityTab({ dark, userName, userPhoto }) {
       )}
 
       <div className="mt-8">
-        <h2 className="text-lg font-bold mb-3" style={{ color: dark ? "#fff" : "#241A12" }}>গ্রুপ চ্যাট</h2>
-        <ChatPanel dark={dark} userName={userName} userPhoto={userPhoto} />
+        <h2 className="text-lg font-bold mb-3" style={{ color: dark ? "#fff" : "#241A12" }}>চ্যাট</h2>
+        <ChatHub dark={dark} userName={userName} userPhoto={userPhoto} />
       </div>
     </div>
   );
 }
 
-function ChatPanel({ dark, userName, userPhoto }) {
+const COMMUNITY_GROUP_ID = "00000000-0000-0000-0000-000000000001";
+
+function ChatHub({ dark, userName, userPhoto }) {
+  const cs = window.cloudSync;
+  const myId = cs.getUserId();
+  const [directory, setDirectory] = useState([]);
+  const [groups, setGroups] = useState([]);
+  const [showNewGroup, setShowNewGroup] = useState(false);
+  const [active, setActive] = useState({ type: "group", groupId: COMMUNITY_GROUP_ID, name: "Community" });
+
+  const loadSidebar = useCallback(async () => {
+    const [dir, gs] = await Promise.all([cs.fetchDirectory(), cs.fetchMyGroups()]);
+    setDirectory(dir);
+    setGroups(gs);
+  }, []);
+
+  useEffect(() => { loadSidebar(); }, [loadSidebar]);
+
+  return (
+    <div className="flex flex-col sm:flex-row gap-4">
+      <div className="w-full sm:w-56 flex-shrink-0 space-y-1">
+        <button onClick={() => setActive({ type: "group", groupId: COMMUNITY_GROUP_ID, name: "Community" })}
+          className="w-full text-left text-sm px-3 py-2 rounded truncate"
+          style={{ background: active.groupId === COMMUNITY_GROUP_ID ? "var(--accent)" : "transparent", color: active.groupId === COMMUNITY_GROUP_ID ? "#fff" : (dark ? "#ddd" : "#333") }}>
+          # Community
+        </button>
+        {groups.filter((g) => !g.is_public).map((g) => (
+          <button key={g.id} onClick={() => setActive({ type: "group", groupId: g.id, name: g.name })}
+            className="w-full text-left text-sm px-3 py-2 rounded truncate"
+            style={{ background: active.groupId === g.id ? "var(--accent)" : "transparent", color: active.groupId === g.id ? "#fff" : (dark ? "#ddd" : "#333") }}>
+            # {g.name}
+          </button>
+        ))}
+        <button onClick={() => setShowNewGroup(true)} className="w-full text-left text-xs px-3 py-2 rounded" style={{ color: "var(--accent)" }}>
+          + নতুন গ্রুপ
+        </button>
+
+        <div className="pt-2 mt-2" style={{ borderTop: "1px solid var(--border)" }}>
+          <p className="text-xs px-3 mb-1" style={{ color: dark ? "#888" : "#999" }}>ডাইরেক্ট মেসেজ</p>
+          <div className="max-h-40 overflow-y-auto">
+            {directory.filter((d) => d.user_id && d.user_id !== myId).map((d) => (
+              <button key={d.user_id} onClick={() => setActive({ type: "dm", recipientId: d.user_id, name: d.name || "Anonymous" })}
+                className="w-full text-left text-xs px-3 py-1.5 rounded truncate"
+                style={{ background: active.recipientId === d.user_id ? "var(--accent)" : "transparent", color: active.recipientId === d.user_id ? "#fff" : (dark ? "#aaa" : "#666") }}>
+                {d.name || "Anonymous"}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <ChatThread key={active.type + (active.groupId || active.recipientId)} dark={dark} userName={userName} userPhoto={userPhoto} active={active} />
+      </div>
+
+      {showNewGroup && (
+        <NewGroupModal
+          dark={dark}
+          directory={directory}
+          onClose={() => setShowNewGroup(false)}
+          onCreate={async (name, memberIds) => {
+            const group = await cs.createGroup(name, memberIds);
+            setShowNewGroup(false);
+            await loadSidebar();
+            setActive({ type: "group", groupId: group.id, name: group.name });
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ChatThread({ dark, userName, userPhoto, active }) {
+  const cs = window.cloudSync;
   const [messages, setMessages] = useState(null);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
   const listRef = useRef(null);
-  const cs = window.cloudSync;
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const data = await cs.fetchChatMessages(50);
+      setMessages(null);
+      const target = active.type === "group" ? { groupId: active.groupId } : { recipientId: active.recipientId };
+      const data = await cs.fetchMessages(target, 50);
       if (!cancelled) setMessages(data);
     })();
-    const unsubscribe = cs.subscribeToChat((row) => {
-      setMessages((prev) => (prev ? [...prev, row] : [row]));
+    const unsubscribe = cs.subscribeToMessages((row) => {
+      const belongs = active.type === "group"
+        ? row.group_id === active.groupId
+        : !row.group_id && (row.sender_id === active.recipientId || row.recipient_id === active.recipientId);
+      if (belongs) setMessages((prev) => (prev ? [...prev, row] : [row]));
     });
     return () => { cancelled = true; unsubscribe(); };
-  }, []);
+  }, [active.type, active.groupId, active.recipientId]);
 
   useEffect(() => {
     if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
@@ -7096,7 +7216,13 @@ function ChatPanel({ dark, userName, userPhoto }) {
     setSending(true);
     setError("");
     try {
-      await cs.sendChatMessage(userName, userPhoto, text);
+      await cs.sendMessage({
+        groupId: active.type === "group" ? active.groupId : null,
+        recipientId: active.type === "dm" ? active.recipientId : null,
+        message: text,
+        name: userName,
+        photo: userPhoto,
+      });
       setDraft("");
     } catch (err) {
       setError("মেসেজ পাঠানো যায়নি, আবার চেষ্টা করুন।");
@@ -7106,8 +7232,14 @@ function ChatPanel({ dark, userName, userPhoto }) {
   }
 
   return (
-    <div className="rounded-lg overflow-hidden" style={{ border: "1px solid var(--border)" }}>
-      <div ref={listRef} className="p-3 space-y-2 overflow-y-auto" style={{ height: 340, background: dark ? "#14161A" : "#fafafa" }}>
+    <div className="rounded-lg overflow-hidden flex flex-col" style={{ border: "1px solid var(--border)", height: 420 }}>
+      <div className="px-3 py-2 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border)", background: dark ? "#1c1f26" : "#fff" }}>
+        <span className="text-sm font-semibold truncate" style={{ color: dark ? "#fff" : "#241A12" }}>
+          {active.type === "group" ? "# " : ""}{active.name}
+        </span>
+        <span className="text-[10px] flex-shrink-0 ml-2" style={{ color: dark ? "#6b7280" : "#aaa" }}>মেসেজ ৭২ ঘণ্টা পর মুছে যায়</span>
+      </div>
+      <div ref={listRef} className="flex-1 p-3 space-y-2 overflow-y-auto" style={{ background: dark ? "#14161A" : "#fafafa" }}>
         {messages === null ? (
           <p className="text-sm" style={{ color: dark ? "#9aa1ad" : "#888" }}>লোড হচ্ছে…</p>
         ) : messages.length === 0 ? (
@@ -7115,17 +7247,17 @@ function ChatPanel({ dark, userName, userPhoto }) {
         ) : (
           messages.map((m) => (
             <div key={m.id} className="flex items-start gap-2">
-              {m.photo ? (
-                <img src={m.photo} alt="" className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
+              {m.sender_photo ? (
+                <img src={m.sender_photo} alt="" className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
               ) : (
                 <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
                   style={{ background: "var(--accent)", color: "#fff" }}>
-                  {(m.name || "?").slice(0, 1).toUpperCase()}
+                  {(m.sender_name || "?").slice(0, 1).toUpperCase()}
                 </div>
               )}
               <div className="min-w-0">
                 <div className="flex items-baseline gap-2">
-                  <span className="text-xs font-semibold" style={{ color: dark ? "#fff" : "#241A12" }}>{m.name || "Anonymous"}</span>
+                  <span className="text-xs font-semibold" style={{ color: dark ? "#fff" : "#241A12" }}>{m.sender_name || "Anonymous"}</span>
                   <span className="text-[10px]" style={{ color: dark ? "#6b7280" : "#aaa" }}>
                     {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                   </span>
@@ -7136,7 +7268,7 @@ function ChatPanel({ dark, userName, userPhoto }) {
           ))
         )}
       </div>
-      {error && <p className="text-xs px-3 pt-2" style={{ color: "#e2725b" }}>{error}</p>}
+      {error && <p className="text-xs px-3 pt-1" style={{ color: "#e2725b" }}>{error}</p>}
       <form onSubmit={submit} className="flex gap-2 p-2" style={{ borderTop: "1px solid var(--border)", background: dark ? "#1c1f26" : "#fff" }}>
         <input
           type="text" value={draft} onChange={(e) => setDraft(e.target.value)}
@@ -7151,6 +7283,49 @@ function ChatPanel({ dark, userName, userPhoto }) {
         </button>
       </form>
     </div>
+  );
+}
+
+function NewGroupModal({ dark, directory, onClose, onCreate }) {
+  const [name, setName] = useState("");
+  const [selected, setSelected] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const myId = window.cloudSync.getUserId();
+
+  function toggle(uid) {
+    setSelected((prev) => (prev.includes(uid) ? prev.filter((x) => x !== uid) : [...prev, uid]));
+  }
+
+  return (
+    <ModalShell title="GROUP" subtitle="নতুন গ্রুপ বানান" onClose={onClose}>
+      <p className="text-xs mb-1" style={{ color: "var(--muted)" }}>গ্রুপের নাম</p>
+      <input
+        value={name} onChange={(e) => setName(e.target.value)}
+        placeholder="যেমন: Physics Study Squad"
+        className="w-full text-sm px-3 py-2 rounded-lg mb-3 tk-field"
+        style={{ border: "1px solid var(--border)", fontFamily: "Lora, serif" }}
+      />
+      <p className="text-xs mb-1" style={{ color: "var(--muted)" }}>মেম্বার বাছাই করুন</p>
+      <div className="max-h-48 overflow-y-auto mb-3 space-y-1">
+        {directory.filter((d) => d.user_id && d.user_id !== myId).length === 0 && (
+          <p className="text-xs" style={{ color: "var(--muted)" }}>এখনো কেউ সাইন আপ করেনি।</p>
+        )}
+        {directory.filter((d) => d.user_id && d.user_id !== myId).map((d) => (
+          <label key={d.user_id} className="flex items-center gap-2 text-sm px-2 py-1.5 rounded cursor-pointer"
+            style={{ background: selected.includes(d.user_id) ? "var(--accent)" : "transparent", color: selected.includes(d.user_id) ? "#fff" : (dark ? "#ddd" : "#333") }}>
+            <input type="checkbox" checked={selected.includes(d.user_id)} onChange={() => toggle(d.user_id)} />
+            {d.name || "Anonymous"}
+          </label>
+        ))}
+      </div>
+      <button
+        disabled={!name.trim() || busy}
+        onClick={async () => { setBusy(true); await onCreate(name.trim(), selected); setBusy(false); }}
+        className="w-full text-sm font-semibold px-3 py-2 rounded-lg"
+        style={{ background: "var(--ink-strong)", color: "var(--on-ink)", opacity: !name.trim() || busy ? 0.6 : 1 }}>
+        গ্রুপ তৈরি করুন
+      </button>
+    </ModalShell>
   );
 }
 
