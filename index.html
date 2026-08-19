@@ -3888,157 +3888,157 @@ const PROTOCOL_SECTORS = [
     id: "env",
     num: "01",
     icon: MapPin,
-    title: "এনভায়রনমেন্ট ও সেটআপ",
-    tags: ["T3", "T10", "T11", "T14"],
+    title: { en: "Environment & Setup", bn: "এনভায়রনমেন্ট ও সেটআপ" },
     items: [
-      { b: "ডেডিকেটেড স্টাডি স্পট/সিগন্যাল", t: `নির্দিষ্ট জায়গা বা "স্টাডি ল্যাম্প" জাতীয় কিছু যেটা শুধু পড়ার সময়ই ব্যবহার হয়।`, c: "T3, T11" },
-      { b: "রিচুয়াল/কন্ডিশনিং", t: `প্রতিদিন একই সময়-জায়গা-সেটআপ দিয়ে শুরু করলে ব্রেইন সেটাকে "ফোকাস মোড"-এর সিগন্যাল হিসেবে চিনে নেয়।`, c: "T10, T14" },
-      { b: "বেডরুম/ডাইনিং/লিভিং রুম এড়ানো", t: "বিশেষ করে বিছানার দিকে মুখ করে না বসা।", c: "T11" },
-      { b: "এনভায়রনমেন্ট বদলানো", t: "সকাল বনাম সন্ধ্যা আলাদা জায়গায়, বা বোরিং টাস্কের জন্য ইচ্ছাকৃতভাবে দূরের কোনো লাইব্রেরিতে যাওয়া।", c: "T3, T13" },
-      { b: "ডিভাইস দূরে রাখা", t: "এয়ারপ্লেন মোড বা অন্য রুমে রাখা, নয়েজ-ক্যান্সেলিং হেডফোন/হোয়াইট নয়েজ ব্যবহার।", c: "T10, T14" },
-      { b: "টুলস", t: "Forest, Cold Turkey, Anki, Notion জাতীয় ব্লকার/ট্র্যাকিং অ্যাপ ব্যবহার।", c: "T14" },
+      { b: { en: "Dedicated Study Spot / Signal", bn: "ডেডিকেটেড স্টাডি স্পট/সিগন্যাল" }, t: { en: `A fixed spot, or something like a "study lamp," that's used only during study time.`, bn: `নির্দিষ্ট জায়গা বা "স্টাডি ল্যাম্প" জাতীয় কিছু যেটা শুধু পড়ার সময়ই ব্যবহার হয়।` } },
+      { b: { en: "Ritual / Conditioning", bn: "রিচুয়াল/কন্ডিশনিং" }, t: { en: `Starting each day with the same time-place-setup trains your brain to recognize it as a "focus mode" signal.`, bn: `প্রতিদিন একই সময়-জায়গা-সেটআপ দিয়ে শুরু করলে ব্রেইন সেটাকে "ফোকাস মোড"-এর সিগন্যাল হিসেবে চিনে নেয়।` } },
+      { b: { en: "Avoid Bedroom / Dining / Living Room", bn: "বেডরুম/ডাইনিং/লিভিং রুম এড়ানো" }, t: { en: "Especially avoid sitting facing the bed.", bn: "বিশেষ করে বিছানার দিকে মুখ করে না বসা।" } },
+      { b: { en: "Change of Environment", bn: "এনভায়রনমেন্ট বদলানো" }, t: { en: "Study in different spots for morning vs. evening, or deliberately go to a farther library for boring tasks.", bn: "সকাল বনাম সন্ধ্যা আলাদা জায়গায়, বা বোরিং টাস্কের জন্য ইচ্ছাকৃতভাবে দূরের কোনো লাইব্রেরিতে যাওয়া।" } },
+      { b: { en: "Keep Devices Away", bn: "ডিভাইস দূরে রাখা" }, t: { en: "Airplane mode or leave your phone in another room; use noise-cancelling headphones/white noise.", bn: "এয়ারপ্লেন মোড বা অন্য রুমে রাখা, নয়েজ-ক্যান্সেলিং হেডফোন/হোয়াইট নয়েজ ব্যবহার।" } },
+      { b: { en: "Tools", bn: "টুলস" }, t: { en: "Use blocker/tracking apps like Forest, Cold Turkey, Anki, Notion.", bn: "Forest, Cold Turkey, Anki, Notion জাতীয় ব্লকার/ট্র্যাকিং অ্যাপ ব্যবহার।" } },
     ],
   },
   {
     id: "schedule",
     num: "02",
     icon: CalendarDays,
-    title: "শিডিউল ফিলোসফি",
-    tags: ["T1", "T3", "T10", "T13", "T14"],
+    title: { en: "Schedule Philosophy", bn: "শিডিউল ফিলোসফি" },
     items: [
-      { b: "অ্যান্টি-শিডিউল", t: "অবসরের সময় আগে ফিক্সড করা, কাজের সময় শিডিউল না করে পরে রেকর্ড করা।", c: "T1" },
-      { b: "সার্কেডিয়ান/আল্ট্রাডিয়ান রিদম", t: "৯০ মিনিট ফোকাস ব্লক + ২০ মিনিট রেস্ট, দিনে ২-৩টা পিক এনার্জি সময় (সাধারণত সকাল ও সন্ধ্যা) কাজে লাগানো।", c: "T3, T10" },
-      { b: "রিলিজ পিরিয়ড", t: "রাতে ১-২ ঘণ্টা ভাইস/স্ক্রলিং-এর জন্য আলাদা বরাদ্দ সময়, শুধু ওই সময়েই অনুমতি।", c: "T3" },
-      { b: "Sprint-Break রেশিও", t: "৫০/১০, ৪৫/১৫, ২৫-৩০ মিনিট ব্লক; ভিডিওভেদে সংখ্যা আলাদা হলেও কোর আইডিয়া একই।", c: "T3, T9, T10, T11, T13, T14" },
-      { b: "\u201cChoose your hard days\u201d", t: "আগে থেকে নির্দিষ্ট দিন বেছে কঠোর পরিশ্রম, বাকি দিন হালকা।", c: "T13" },
-      { b: "পরিকল্পিত রিকভারি ডে", t: "প্রতি ৬-৭ দিনে একটা হালকা দিন, গিল্ট ছাড়াই।", c: "T14" },
+      { b: { en: "Anti-Schedule", bn: "অ্যান্টি-শিডিউল" }, t: { en: "Fix your leisure time in advance; instead of scheduling work time, log it after the fact.", bn: "অবসরের সময় আগে ফিক্সড করা, কাজের সময় শিডিউল না করে পরে রেকর্ড করা।" } },
+      { b: { en: "Circadian / Ultradian Rhythm", bn: "সার্কেডিয়ান/আল্ট্রাডিয়ান রিদম" }, t: { en: "90-minute focus blocks + 20-minute rest; use your 2-3 daily peak-energy windows (usually morning and evening).", bn: "৯০ মিনিট ফোকাস ব্লক + ২০ মিনিট রেস্ট, দিনে ২-৩টা পিক এনার্জি সময় (সাধারণত সকাল ও সন্ধ্যা) কাজে লাগানো।" } },
+      { b: { en: "Release Period", bn: "রিলিজ পিরিয়ড" }, t: { en: "Set aside 1-2 hours at night for vices/scrolling — only allowed during that window.", bn: "রাতে ১-২ ঘণ্টা ভাইস/স্ক্রলিং-এর জন্য আলাদা বরাদ্দ সময়, শুধু ওই সময়েই অনুমতি।" } },
+      { b: { en: "Sprint-Break Ratio", bn: "Sprint-Break রেশিও" }, t: { en: "50/10, 45/15, 25-30 minute blocks; the exact numbers vary by source, but the core idea stays the same.", bn: "৫০/১০, ৪৫/১৫, ২৫-৩০ মিনিট ব্লক; ভিডিওভেদে সংখ্যা আলাদা হলেও কোর আইডিয়া একই।" } },
+      { b: { en: `"Choose Your Hard Days"`, bn: `"Choose your hard days"` }, t: { en: "Pick specific days in advance for intense effort; keep the rest lighter.", bn: "আগে থেকে নির্দিষ্ট দিন বেছে কঠোর পরিশ্রম, বাকি দিন হালকা।" } },
+      { b: { en: "Planned Recovery Day", bn: "পরিকল্পিত রিকভারি ডে" }, t: { en: "One light day every 6-7 days, guilt-free.", bn: "প্রতি ৬-৭ দিনে একটা হালকা দিন, গিল্ট ছাড়াই।" } },
     ],
   },
   {
     id: "learning",
     num: "03",
     icon: BookOpen,
-    title: "অ্যাক্টিভ লার্নিং টেকনিক",
-    tags: ["T2", "T5", "T7", "T8", "T9", "T11"],
+    title: { en: "Active Learning Techniques", bn: "অ্যাক্টিভ লার্নিং টেকনিক" },
     items: [
-      { b: "Active Recall / Testing", t: "বই বন্ধ করে মনে করার চেষ্টা, ফ্ল্যাশকার্ড, কুইজ; শুধু রিরিডিং না।", c: "T2, T5, T7, T9, T10, T11" },
-      { b: "ইন্টারলিভিং", t: "একাধিক সাবজেক্ট মিশিয়ে পড়া, একটানা একই টপিক না।", c: "T7" },
-      { b: "স্পেসিং", t: "কয়েকদিন ধরে রিভিশন ছড়িয়ে দেওয়া, ক্র্যামিং না।", c: "T7" },
-      { b: "ফাইনম্যান টেকনিক", t: "কাউকে শেখানোর ভান করে সহজ ভাষায় ব্যাখ্যা করা।", c: "T9, T11" },
-      { b: "SQ3R", t: "Survey → Question → Read → Recite → Review।", c: "T11" },
-      { b: "Mnemonics", t: "অ্যাক্রোনিম, কয়েনড ফ্রেজ, ইন্টারঅ্যাক্টিং ইমেজ।", c: "T11" },
-      { b: "Question-first approach", t: "থিওরি আগে না পড়ে প্রশ্ন দিয়ে শুরু করা।", c: "T2, T5" },
-      { b: "Recognition vs Recollection", t: "হাইলাইটিং কেন false confidence দেয়, তার পেছনের সাইকোলজি।", c: "T11" },
-      { b: "Error/Mistake log", t: "ভুল প্রশ্ন আলাদা নোটবুকে রাখা, কারণ ট্যাগ করা (misread / overthink / knowledge-gap)।", c: "T5, T8" },
-      { b: "80/20 প্রায়োরিটাইজেশন ও Horizontal learning", t: "কম গুরুত্বপূর্ণ টপিক স্কিপ, সম্পর্কিত টপিক কানেক্ট করে পড়া।", c: "T8" },
+      { b: { en: "Active Recall / Testing", bn: "Active Recall / Testing" }, t: { en: "Close the book and try to recall, use flashcards and quizzes — don't just re-read.", bn: "বই বন্ধ করে মনে করার চেষ্টা, ফ্ল্যাশকার্ড, কুইজ; শুধু রিরিডিং না।" } },
+      { b: { en: "Interleaving", bn: "ইন্টারলিভিং" }, t: { en: "Mix multiple subjects together instead of studying one topic continuously.", bn: "একাধিক সাবজেক্ট মিশিয়ে পড়া, একটানা একই টপিক না।" } },
+      { b: { en: "Spacing", bn: "স্পেসিং" }, t: { en: "Spread revision out over several days instead of cramming.", bn: "কয়েকদিন ধরে রিভিশন ছড়িয়ে দেওয়া, ক্র্যামিং না।" } },
+      { b: { en: "Feynman Technique", bn: "ফাইনম্যান টেকনিক" }, t: { en: "Explain the concept in simple language as if teaching someone else.", bn: "কাউকে শেখানোর ভান করে সহজ ভাষায় ব্যাখ্যা করা।" } },
+      { b: { en: "SQ3R", bn: "SQ3R" }, t: { en: "Survey → Question → Read → Recite → Review.", bn: "Survey → Question → Read → Recite → Review।" } },
+      { b: { en: "Mnemonics", bn: "Mnemonics" }, t: { en: "Acronyms, coined phrases, interacting images.", bn: "অ্যাক্রোনিম, কয়েনড ফ্রেজ, ইন্টারঅ্যাক্টিং ইমেজ।" } },
+      { b: { en: "Question-First Approach", bn: "Question-first approach" }, t: { en: "Start with questions instead of reading theory first.", bn: "থিওরি আগে না পড়ে প্রশ্ন দিয়ে শুরু করা।" } },
+      { b: { en: "Recognition vs Recollection", bn: "Recognition vs Recollection" }, t: { en: "The psychology behind why highlighting gives false confidence.", bn: "হাইলাইটিং কেন false confidence দেয়, তার পেছনের সাইকোলজি।" } },
+      { b: { en: "Error/Mistake Log", bn: "Error/Mistake log" }, t: { en: "Keep wrong answers in a separate notebook, tagging the cause (misread / overthink / knowledge-gap).", bn: "ভুল প্রশ্ন আলাদা নোটবুকে রাখা, কারণ ট্যাগ করা (misread / overthink / knowledge-gap)।" } },
+      { b: { en: "80/20 Prioritization & Horizontal Learning", bn: "80/20 প্রায়োরিটাইজেশন ও Horizontal learning" }, t: { en: "Skip low-priority topics; connect related topics as you study.", bn: "কম গুরুত্বপূর্ণ টপিক স্কিপ, সম্পর্কিত টপিক কানেক্ট করে পড়া।" } },
     ],
   },
   {
     id: "focus",
     num: "04",
     icon: Clock,
-    title: "ফোকাস মেইনটেনেন্স",
-    tags: ["T2", "T3", "T8", "T10"],
+    title: { en: "Focus Maintenance", bn: "ফোকাস মেইনটেনেন্স" },
     items: [
-      { b: "লায়ন ফোকাস", t: "২ ঘণ্টা ইনটেন্স ফোকাস, তারপর হার্ড রেস্ট; ইনটেন্স ফোকাস যত বেশি, সময় তত কম লাগে।", c: "T2" },
-      { b: "টাইমার/ডেডলাইন এফেক্ট", t: "Parkinson's Law অনুযায়ী নির্দিষ্ট সময়সীমা বেঁধে ফোকাস বাড়ানো।", c: "T3, T8" },
-      { b: "স্ক্রিন-ফ্রি রেস্ট", t: "ব্রেকে ফোন স্ক্রল না করে চোখ বন্ধ/দেয়ালে তাকিয়ে থাকা; স্ক্রলিং আসলে রেস্ট না, বাড়তি স্টিমুলাস।", c: "T10" },
-      { b: "ফোকাস ওয়ার্মআপ", t: "বসার আগে ১-২ মিনিট একটা পয়েন্টে তাকিয়ে থাকা।", c: "T3" },
+      { b: { en: "Lion Focus", bn: "লায়ন ফোকাস" }, t: { en: "2 hours of intense focus, then a hard rest — the more intense the focus, the less time it takes overall.", bn: "২ ঘণ্টা ইনটেন্স ফোকাস, তারপর হার্ড রেস্ট; ইনটেন্স ফোকাস যত বেশি, সময় তত কম লাগে।" } },
+      { b: { en: "Timer / Deadline Effect", bn: "টাইমার/ডেডলাইন এফেক্ট" }, t: { en: "Set a fixed time limit to boost focus, per Parkinson's Law.", bn: "Parkinson's Law অনুযায়ী নির্দিষ্ট সময়সীমা বেঁধে ফোকাস বাড়ানো।" } },
+      { b: { en: "Screen-Free Rest", bn: "স্ক্রিন-ফ্রি রেস্ট" }, t: { en: "During breaks, close your eyes or stare at a wall instead of scrolling — scrolling isn't rest, it's extra stimulation.", bn: "ব্রেকে ফোন স্ক্রল না করে চোখ বন্ধ/দেয়ালে তাকিয়ে থাকা; স্ক্রলিং আসলে রেস্ট না, বাড়তি স্টিমুলাস।" } },
+      { b: { en: "Focus Warm-up", bn: "ফোকাস ওয়ার্মআপ" }, t: { en: "Before you sit down, stare at a fixed point for 1-2 minutes.", bn: "বসার আগে ১-২ মিনিট একটা পয়েন্টে তাকিয়ে থাকা।" } },
     ],
   },
   {
     id: "emotion",
     num: "05",
     icon: Smile,
-    title: "ইমোশনাল ও সাইকোলজিক্যাল",
-    tags: ["T1", "T2", "T4", "T5", "T6", "T14"],
+    title: { en: "Emotional & Psychological", bn: "ইমোশনাল ও সাইকোলজিক্যাল" },
     items: [
-      { b: "Anti-shame মোটিভেশন", t: "শাস্তি/তুলনা দিয়ে নিজেকে পুশ না করে ছোট, নিরাপদ পদক্ষেপে নার্ভাস সিস্টেম রিট্রেইন করা।", c: "T4" },
-      { b: "Winner effect / momentum", t: "ছোট জয় ট্র্যাক করে কনফিডেন্স বিল্ড করা, শূন্য থেকে যেকোনো ঘণ্টাই একটা জয়।", c: "T1" },
-      { b: "Guilt বনাম Failure", t: "যথেষ্ট চেষ্টা না করার আফসোস আসল ফলাফল না পাওয়ার চেয়ে বেশি ভারী; এফোর্ট দেওয়াই আসল কথা।", c: "T6, T12" },
-      { b: "Morning Pages / Journaling", t: "৫-১০ মিনিট স্ট্রিম-অফ-কনশাসনেস লেখা, অবচেতন ভয় বের করে আনা।", c: "T2" },
-      { b: "Physiologic sigh", t: "প্যানিক মোমেন্টে ২ বার নাক দিয়ে ইনহেল + লম্বা এক্সহেল, প্যারাসিমপ্যাথেটিক অ্যাক্টিভেট করে।", c: "T5" },
-      { b: "On-off cycle early warning", t: "১ দিন মিস ঠিক আছে, ২ দিন সতর্ক, ৩ দিন কোলাপ্স-ঝুঁকি — গিল্ট আসার আগেই ফিরে আসা।", c: "T14" },
-      { b: "একাধিক মেন্টর/সোর্স এড়ানো", t: "পরস্পরবিরোধী পরামর্শে বিভ্রান্ত না হয়ে একটাই আইডিওলজি ফলো করা।", c: "T6" },
+      { b: { en: "Anti-Shame Motivation", bn: "Anti-shame মোটিভেশন" }, t: { en: "Instead of pushing yourself with punishment or comparison, retrain your nervous system with small, safe steps.", bn: "শাস্তি/তুলনা দিয়ে নিজেকে পুশ না করে ছোট, নিরাপদ পদক্ষেপে নার্ভাস সিস্টেম রিট্রেইন করা।" } },
+      { b: { en: "Winner Effect / Momentum", bn: "Winner effect / momentum" }, t: { en: "Track small wins to build confidence — any hour of study from zero counts as a win.", bn: "ছোট জয় ট্র্যাক করে কনফিডেন্স বিল্ড করা, শূন্য থেকে যেকোনো ঘণ্টাই একটা জয়।" } },
+      { b: { en: "Guilt vs. Failure", bn: "Guilt বনাম Failure" }, t: { en: "Regret over not trying hard enough weighs heavier than not getting the result — putting in the effort is what matters.", bn: "যথেষ্ট চেষ্টা না করার আফসোস আসল ফলাফল না পাওয়ার চেয়ে বেশি ভারী; এফোর্ট দেওয়াই আসল কথা।" } },
+      { b: { en: "Morning Pages / Journaling", bn: "Morning Pages / Journaling" }, t: { en: "Write stream-of-consciousness for 5-10 minutes to surface subconscious fears.", bn: "৫-১০ মিনিট স্ট্রিম-অফ-কনশাসনেস লেখা, অবচেতন ভয় বের করে আনা।" } },
+      { b: { en: "Physiologic Sigh", bn: "Physiologic sigh" }, t: { en: "During a panic moment, take two quick inhales through the nose + one long exhale — it activates the parasympathetic response.", bn: "প্যানিক মোমেন্টে ২ বার নাক দিয়ে ইনহেল + লম্বা এক্সহেল, প্যারাসিমপ্যাথেটিক অ্যাক্টিভেট করে।" } },
+      { b: { en: "On-Off Cycle Early Warning", bn: "On-off cycle early warning" }, t: { en: "Missing 1 day is fine, 2 days is a warning sign, 3 days risks a full collapse — get back on track before the guilt sets in.", bn: "১ দিন মিস ঠিক আছে, ২ দিন সতর্ক, ৩ দিন কোলাপ্স-ঝুঁকি — গিল্ট আসার আগেই ফিরে আসা।" } },
+      { b: { en: "Avoid Multiple Mentors/Sources", bn: "একাধিক মেন্টর/সোর্স এড়ানো" }, t: { en: "Follow a single approach instead of getting confused by conflicting advice.", bn: "পরস্পরবিরোধী পরামর্শে বিভ্রান্ত না হয়ে একটাই আইডিওলজি ফলো করা।" } },
     ],
   },
   {
     id: "exam",
     num: "06",
     icon: ClipboardList,
-    title: "এক্সাম-ডে স্ট্র্যাটেজি",
-    tags: ["T5", "T6", "T12"],
+    title: { en: "Exam-Day Strategy", bn: "এক্সাম-ডে স্ট্র্যাটেজি" },
     items: [
-      { b: "টু-পাস সিস্টেম", t: "সহজ প্রশ্ন আগে শেষ করা, কঠিনগুলো মার্ক করে দ্বিতীয় পাসে ফেরত আসা।", c: "T5" },
-      { b: "প্রশ্ন প্রথমে পড়া", t: "প্যাসেজ/ডিটেইল পরে — সময় বাঁচে, স্ট্রেস কমে।", c: "T5" },
-      { b: "থ্রি-থ্রি-থ্রি রুল", t: "৩ আঙুল জায়গা, ৩ মিনিট সময়, সর্বোচ্চ ৩ বার চেষ্টা, তারপর স্কিপ।", c: "T6, T12" },
-      { b: "৭০-২০-১০ রুল", t: `প্রশ্নের কঠিনতার বণ্টন বুঝে "বাপরে বাপ" ক্যাটাগরি সময়মতো ছেড়ে দেওয়া।`, c: "T6" },
-      { b: "ট্র্যাপ সচেতনতা", t: "ইচ্ছাকৃত ভুল প্রশ্ন, কাছাকাছি উত্তর বসিয়ে রাখা, মাইনাস মার্কিং নিয়ে সতর্কতা।", c: "T6" },
-      { b: "অফলাইন মক টেস্ট আবশ্যিক", t: "বাস্তব পরীক্ষার পরিবেশে প্র্যাকটিস, কারণ এক্সাম-হল স্ট্রেস বাসার চেয়ে আলাদা।", c: "T5, T6, T12" },
-      { b: `"পারা জিনিস মিস না করা"-ই আসল`, t: "বেশিরভাগ চান্স মিস হয় কঠিন প্রশ্ন না পারার কারণে না, জানা জিনিস ভুল/মিস করার কারণে।", c: "T12" },
+      { b: { en: "Two-Pass System", bn: "টু-পাস সিস্টেম" }, t: { en: "Finish the easy questions first, mark the hard ones and return to them in a second pass.", bn: "সহজ প্রশ্ন আগে শেষ করা, কঠিনগুলো মার্ক করে দ্বিতীয় পাসে ফেরত আসা।" } },
+      { b: { en: "Read the Question First", bn: "প্রশ্ন প্রথমে পড়া" }, t: { en: "Read the passage/details afterward — saves time and reduces stress.", bn: "প্যাসেজ/ডিটেইল পরে — সময় বাঁচে, স্ট্রেস কমে।" } },
+      { b: { en: "Three-Three-Three Rule", bn: "থ্রি-থ্রি-থ্রি রুল" }, t: { en: "Three-finger-width of space, three minutes of time, max three attempts — then skip.", bn: "৩ আঙুল জায়গা, ৩ মিনিট সময়, সর্বোচ্চ ৩ বার চেষ্টা, তারপর স্কিপ।" } },
+      { b: { en: "70-20-10 Rule", bn: "৭০-২০-১০ রুল" }, t: { en: `Understand the difficulty distribution of questions and let go of the "way too hard" category in time.`, bn: `প্রশ্নের কঠিনতার বণ্টন বুঝে "বাপরে বাপ" ক্যাটাগরি সময়মতো ছেড়ে দেওয়া।` } },
+      { b: { en: "Trap Awareness", bn: "ট্র্যাপ সচেতনতা" }, t: { en: "Watch for deliberately misleading questions, near-identical answer choices, and negative marking.", bn: "ইচ্ছাকৃত ভুল প্রশ্ন, কাছাকাছি উত্তর বসিয়ে রাখা, মাইনাস মার্কিং নিয়ে সতর্কতা।" } },
+      { b: { en: "Offline Mock Tests Are Essential", bn: "অফলাইন মক টেস্ট আবশ্যিক" }, t: { en: "Practice in real exam-like conditions — exam-hall stress is different from studying at home.", bn: "বাস্তব পরীক্ষার পরিবেশে প্র্যাকটিস, কারণ এক্সাম-হল স্ট্রেস বাসার চেয়ে আলাদা।" } },
+      { b: { en: `"Not Missing What You Know" Is What Matters`, bn: `"পারা জিনিস মিস না করা"-ই আসল` }, t: { en: "Most chances are lost not from hard questions you couldn't solve, but from mistakes on things you actually knew.", bn: "বেশিরভাগ চান্স মিস হয় কঠিন প্রশ্ন না পারার কারণে না, জানা জিনিস ভুল/মিস করার কারণে।" } },
     ],
   },
   {
     id: "admission",
     num: "07",
     icon: GraduationCap,
-    title: "অ্যাডমিশন-স্পেসিফিক (BD)",
-    tags: ["T6", "T12"],
+    title: { en: "Admission-Specific (BD)", bn: "অ্যাডমিশন-স্পেসিফিক (BD)" },
     items: [
-      { b: "ইউনিট বাছাই", t: "রেজাল্ট/পয়েন্ট অনুযায়ী কোন ইউনিটে পরীক্ষা দেওয়া বাস্তবসম্মত তা আগেভাগে ঠিক করা, রেজাল্টের পরে সুইচ না করা।" },
-      { b: "ফর্মুলা শিট", t: "প্রতিটা চ্যাপ্টারের ফর্মুলা আলাদা করে লিখে নিয়মিত রিভিশন।" },
-      { b: "চ্যাপ্টার-ওয়াইজ প্র্যাকটিস", t: "কোশ্চেন ব্যাংক সাল-ওয়াইজ না করে চ্যাপ্টার/টাইপ-ওয়াইজ সমাধান করা।" },
-      { b: "সিঙ্গেল সোর্স প্রিন্সিপল", t: "একাধিক বই না ঘেঁটে একটা নির্ভরযোগ্য সোর্স গভীরভাবে প্র্যাকটিস করা।" },
-      { b: "২০টা কমন ভুল এড়ানো", t: "সার্কুলার-নেশা (আগে থেকে শুরু না করা), ফোন অ্যাডিকশন, রিলেশন/এক্সপ্লোরিং-এ সময় নষ্ট, লাইভ ক্লাস জমিয়ে রাখা।" },
+      { b: { en: "Unit Selection", bn: "ইউনিট বাছাই" }, t: { en: "Decide in advance, based on your results/points, which unit is realistic to sit for — don't switch after results come out.", bn: "রেজাল্ট/পয়েন্ট অনুযায়ী কোন ইউনিটে পরীক্ষা দেওয়া বাস্তবসম্মত তা আগেভাগে ঠিক করা, রেজাল্টের পরে সুইচ না করা।" } },
+      { b: { en: "Formula Sheet", bn: "ফর্মুলা শিট" }, t: { en: "Write out each chapter's formulas separately and revise them regularly.", bn: "প্রতিটা চ্যাপ্টারের ফর্মুলা আলাদা করে লিখে নিয়মিত রিভিশন।" } },
+      { b: { en: "Chapter-Wise Practice", bn: "চ্যাপ্টার-ওয়াইজ প্র্যাকটিস" }, t: { en: "Solve question banks chapter/type-wise instead of year-wise.", bn: "কোশ্চেন ব্যাংক সাল-ওয়াইজ না করে চ্যাপ্টার/টাইপ-ওয়াইজ সমাধান করা।" } },
+      { b: { en: "Single-Source Principle", bn: "সিঙ্গেল সোর্স প্রিন্সিপল" }, t: { en: "Instead of jumping between books, go deep with one reliable source.", bn: "একাধিক বই না ঘেঁটে একটা নির্ভরযোগ্য সোর্স গভীরভাবে প্র্যাকটিস করা।" } },
+      { b: { en: "Avoid the 20 Common Mistakes", bn: "২০টা কমন ভুল এড়ানো" }, t: { en: "Circular-addiction (not starting early), phone addiction, wasting time on relationships/exploring, and letting live classes pile up.", bn: "সার্কুলার-নেশা (আগে থেকে শুরু না করা), ফোন অ্যাডিকশন, রিলেশন/এক্সপ্লোরিং-এ সময় নষ্ট, লাইভ ক্লাস জমিয়ে রাখা।" } },
     ],
   },
   {
     id: "health",
     num: "08",
     icon: Sunrise,
-    title: "শারীরিক স্বাস্থ্য",
-    tags: ["T3", "T11", "T13", "T14"],
+    title: { en: "Physical Health", bn: "শারীরিক স্বাস্থ্য" },
     items: [
-      { b: "ঘুম ও REM sleep", t: "শর্ট-টার্ম থেকে লং-টার্ম মেমোরি কনসোলিডেশন মূলত ঘুমের সময় হয়; পর্যাপ্ত (~৮ ঘণ্টা) ঘুম ছাড়া পড়া স্থায়ী হয় না।", c: "T11" },
-      { b: "হাইড্রেশন ও নিয়মিত খাবার", t: "কোনো মিল স্কিপ না করা, নিয়মিত পানি খাওয়া।", c: "T13, T14" },
-      { b: "চিনি/এনার্জি ড্রিংক এড়ানো", t: "সাময়িক এনার্জি বার্স্ট দিলেও দ্রুত ক্র্যাশ করায়।", c: "T3, T13, T14" },
-      { b: "হাঁটা/হালকা ব্যায়াম", t: "ব্রেক ও রিকভারি ডে-তে রেস্ট অ্যাক্টিভিটি হিসেবে বারবার উল্লেখিত।", c: "T3, T14" },
+      { b: { en: "Sleep & REM Sleep", bn: "ঘুম ও REM sleep" }, t: { en: "Short-term to long-term memory consolidation mostly happens during sleep — without enough sleep (~8 hours), what you study doesn't stick.", bn: "শর্ট-টার্ম থেকে লং-টার্ম মেমোরি কনসোলিডেশন মূলত ঘুমের সময় হয়; পর্যাপ্ত (~৮ ঘণ্টা) ঘুম ছাড়া পড়া স্থায়ী হয় না।" } },
+      { b: { en: "Hydration & Regular Meals", bn: "হাইড্রেশন ও নিয়মিত খাবার" }, t: { en: "Don't skip meals, and drink water regularly.", bn: "কোনো মিল স্কিপ না করা, নিয়মিত পানি খাওয়া।" } },
+      { b: { en: "Avoid Sugar/Energy Drinks", bn: "চিনি/এনার্জি ড্রিংক এড়ানো" }, t: { en: "They give a temporary energy burst but cause a quick crash.", bn: "সাময়িক এনার্জি বার্স্ট দিলেও দ্রুত ক্র্যাশ করায়।" } },
+      { b: { en: "Walking / Light Exercise", bn: "হাঁটা/হালকা ব্যায়াম" }, t: { en: "Repeatedly recommended as a rest activity during breaks and recovery days.", bn: "ব্রেক ও রিকভারি ডে-তে রেস্ট অ্যাক্টিভিটি হিসেবে বারবার উল্লেখিত।" } },
     ],
   },
 ];
 
-function ProtocolTag({ children }) {
-  return (
-    <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ border: "1px solid var(--border)", color: "var(--faint)", fontFamily: "JetBrains Mono, monospace" }}>
-      {children}
-    </span>
-  );
-}
-
-function ProtocolItem({ item }) {
+function ProtocolItem({ item, lang }) {
   return (
     <li className="text-sm leading-relaxed" style={{ color: "var(--ink-soft)" }}>
       <span style={{ color: "var(--accent)" }}>— </span>
-      <b style={{ color: "var(--accent)" }}>{item.b}</b>
-      {" — "}{item.t}
-      {item.c && <span className="text-[11px] ml-1" style={{ color: "var(--faint)" }}>{item.c}</span>}
+      <b style={{ color: "var(--accent)" }}>{item.b[lang]}</b>
+      {" — "}{item.t[lang]}
     </li>
   );
 }
 
 function StudyProtocolTab() {
+  const [lang, setLang] = useState("en");
   return (
     <div>
-      <p className="text-xs mb-4" style={{ color: "var(--faint)" }}>
-        ১৪টা স্টাডি-সম্পর্কিত ভিডিও/লেকচার ট্রান্সক্রিপ্ট থেকে বের করা পরামর্শ, ৮টা সেক্টরে ভাগ করা। প্রতিটা পয়েন্টের পাশে ছোট কোডে (T1, T5...) বোঝানো হয়েছে এটা কোন ট্রান্সক্রিপ্ট থেকে এসেছে।
-      </p>
+      <div className="flex justify-end mb-3">
+        <div className="inline-flex rounded-lg overflow-hidden" style={{ border: "1px solid var(--border)" }}>
+          <button
+            onClick={() => setLang("en")}
+            className="text-[11px] px-2.5 py-1 transition-colors"
+            style={{
+              fontFamily: "JetBrains Mono, monospace",
+              background: lang === "en" ? "var(--accent)" : "transparent",
+              color: lang === "en" ? "#fff" : "var(--faint)",
+            }}
+          >EN</button>
+          <button
+            onClick={() => setLang("bn")}
+            className="text-[11px] px-2.5 py-1 transition-colors"
+            style={{
+              fontFamily: "JetBrains Mono, monospace",
+              background: lang === "bn" ? "var(--accent)" : "transparent",
+              color: lang === "bn" ? "#fff" : "var(--faint)",
+            }}
+          >বাংলা</button>
+        </div>
+      </div>
       {PROTOCOL_SECTORS.map((sec) => (
-        <Section key={sec.id} icon={sec.icon} title={`${sec.num} · ${sec.title}`} accent="var(--accent)" defaultOpen={sec.id === "env"}>
-          <div className="flex flex-wrap gap-1 mb-2">
-            {sec.tags.map((tg) => <ProtocolTag key={tg}>{tg}</ProtocolTag>)}
-          </div>
+        <Section key={sec.id} icon={sec.icon} title={`${sec.num} · ${sec.title[lang]}`} accent="var(--accent)" defaultOpen={sec.id === "env"}>
           <ul className="list-none flex flex-col gap-2">
-            {sec.items.map((it, i) => <ProtocolItem key={i} item={it} />)}
+            {sec.items.map((it, i) => <ProtocolItem key={i} item={it} lang={lang} />)}
           </ul>
         </Section>
       ))}
@@ -8726,42 +8726,6 @@ function App() {
         .sidebar-toggle-btn:hover { background: var(--surface); color: var(--ink); }
         .glass-sidebar.collapsed .sidebar-toggle-btn { justify-content: center; padding: 11px; gap: 0; }
         .main-with-sidebar { transition: margin-left 0.22s cubic-bezier(0.4,0,0.2,1); }
-
-        /* ---- Floating glassmorphic bottom nav (mobile) ---- */
-        .mobile-glass-nav {
-          position: relative;
-          display: flex; align-items: stretch; gap: 2px;
-          padding: 6px;
-          border-radius: 26px;
-          background: linear-gradient(165deg, var(--panel), var(--surface));
-          border: 1px solid var(--border);
-          backdrop-filter: blur(22px) saturate(150%);
-          -webkit-backdrop-filter: blur(22px) saturate(150%);
-          box-shadow: 0 18px 40px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.03) inset;
-          overflow: visible;
-        }
-        .mobile-glass-nav::before, .mobile-glass-nav::after {
-          content: ""; position: absolute; border-radius: 50%; filter: blur(28px);
-          background: radial-gradient(circle, color-mix(in srgb, var(--accent) 55%, transparent), transparent 70%);
-          z-index: -1; pointer-events: none; opacity: 0.55;
-        }
-        .mobile-glass-nav::before { width: 90px; height: 90px; left: -20px; bottom: -30px; }
-        .mobile-glass-nav::after { width: 70px; height: 70px; right: -10px; top: -30px;
-          background: radial-gradient(circle, color-mix(in srgb, var(--accent) 35%, transparent), transparent 70%); }
-        .mobile-nav-item {
-          position: relative; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
-          gap: 2px; padding: 8px 2px; border-radius: 18px; border: 1px solid transparent;
-          color: var(--muted-on-dark); background: transparent;
-          transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease, border-color 0.2s ease;
-        }
-        .mobile-nav-item:active { transform: scale(0.94); }
-        .mobile-nav-item.active {
-          color: var(--on-ink);
-          background: linear-gradient(150deg, var(--accent), color-mix(in srgb, var(--accent) 70%, black));
-          box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 55%, transparent), 0 0 0 1px color-mix(in srgb, var(--accent) 60%, transparent) inset;
-        }
-        .mobile-nav-item .mobile-nav-label { font-size: 9.5px; font-family: Inter, sans-serif; letter-spacing: 0.01em; }
-        .mobile-nav-item.active .mobile-nav-label { font-weight: 700; }
       `}</style>
 
       <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: -1, background: "var(--overlay)", pointerEvents: "none" }} />
@@ -9191,21 +9155,24 @@ function App() {
         )}
       </div>
 
-      {/* app-like bottom nav — mobile only, floating glassmorphic pill */}
-      <div className="flex md:hidden fixed bottom-3 left-3 right-3 z-20" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-        <div className="mobile-glass-nav" style={{ width: "100%" }}>
-          {MOBILE_TABS.map((t) => {
-            const Icon = t.icon;
-            const active = tab === t.id;
-            return (
-              <button key={t.id} onClick={() => setTab(t.id)}
-                className={`mobile-nav-item${active ? " active" : ""}`}>
-                <Icon size={18} />
-                <span className="mobile-nav-label">{t.label}</span>
-              </button>
-            );
-          })}
-        </div>
+      {/* app-like bottom nav — mobile only */}
+      <div className="flex md:hidden fixed bottom-0 left-0 right-0 z-20"
+        style={{
+          background: "var(--ink-strong)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
+          borderTop: "1px solid var(--border)", paddingBottom: "env(safe-area-inset-bottom)",
+        }}>
+        {MOBILE_TABS.map((t) => {
+          const Icon = t.icon;
+          const active = tab === t.id;
+          return (
+            <button key={t.id} onClick={() => setTab(t.id)}
+              className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2"
+              style={{ color: active ? "var(--accent)" : "var(--muted-on-dark)", background: "none" }}>
+              <Icon size={19} />
+              <span style={{ fontSize: 10, fontFamily: "Inter, sans-serif", fontWeight: active ? 700 : 500, letterSpacing: "0.01em" }}>{t.label}</span>
+            </button>
+          );
+        })}
       </div>
 
       </div>
