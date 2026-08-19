@@ -130,7 +130,7 @@
 
       async fetchLeaderboard() {
         if (!sb) return [];
-        const { data, error } = await sb.from("leaderboard").select("*").order("overall_progress", { ascending: false });
+        const { data, error } = await sb.from("leaderboard_public").select("*").order("overall_progress", { ascending: false });
         if (error || !data) return [];
         return data;
       },
@@ -209,6 +209,95 @@
           })
           .subscribe();
         return () => { sb.removeChannel(channel); };
+      },
+
+      async fetchGroupMembers(groupId) {
+        if (!sb) return [];
+        const { data, error } = await sb.from("chat_group_members").select("user_id").eq("group_id", groupId);
+        if (error || !data) return [];
+        return data.map((r) => r.user_id);
+      },
+
+      async leaveGroup(groupId) {
+        if (!sb || !currentUserId) return;
+        const { error } = await sb.from("chat_group_members").delete().eq("group_id", groupId).eq("user_id", currentUserId);
+        if (error) throw error;
+      },
+
+      async fetchFriendStatusMap() {
+        if (!sb || !currentUserId) return {};
+        const { data } = await sb.from("friend_requests").select("*").or(`requester_id.eq.${currentUserId},addressee_id.eq.${currentUserId}`);
+        const map = {};
+        (data || []).forEach((r) => {
+          const other = r.requester_id === currentUserId ? r.addressee_id : r.requester_id;
+          if (r.status === "accepted") map[other] = { state: "friends", id: r.id };
+          else if (r.status === "pending") map[other] = { state: r.requester_id === currentUserId ? "pending_sent" : "pending_received", id: r.id };
+        });
+        return map;
+      },
+
+      async fetchFriendRequestsIncoming() {
+        if (!sb || !currentUserId) return [];
+        const { data } = await sb.from("friend_requests").select("*").eq("addressee_id", currentUserId).eq("status", "pending");
+        return data || [];
+      },
+
+      async sendFriendRequest(otherId) {
+        if (!sb || !currentUserId) throw new Error("Not signed in");
+        const { error } = await sb.from("friend_requests").insert({ requester_id: currentUserId, addressee_id: otherId });
+        if (error) throw error;
+      },
+
+      async respondFriendRequest(requestId, accept) {
+        if (!sb) return;
+        const { error } = await sb.from("friend_requests").update({ status: accept ? "accepted" : "declined" }).eq("id", requestId);
+        if (error) throw error;
+      },
+
+      async markRead(conversationKey) {
+        if (!sb || !currentUserId) return;
+        try {
+          await sb.from("chat_reads").upsert(
+            { user_id: currentUserId, conversation_key: conversationKey, last_read_at: new Date().toISOString() },
+            { onConflict: "user_id,conversation_key" }
+          );
+        } catch (e) {}
+      },
+
+      async fetchReadState() {
+        if (!sb || !currentUserId) return {};
+        const { data } = await sb.from("chat_reads").select("conversation_key,last_read_at").eq("user_id", currentUserId);
+        const map = {};
+        (data || []).forEach((r) => { map[r.conversation_key] = r.last_read_at; });
+        return map;
+      },
+
+      // Latest message time per conversation (for unread dots), keyed "g:<groupId>" or "dm:<uid1>:<uid2>" (uids sorted).
+      async fetchRecentActivity(groupIds, limit) {
+        if (!sb || !currentUserId) return {};
+        const orParts = (groupIds || []).map((id) => `group_id.eq.${id}`);
+        orParts.push(`recipient_id.eq.${currentUserId}`);
+        orParts.push(`sender_id.eq.${currentUserId}`);
+        const { data, error } = await sb
+          .from("chat_messages")
+          .select("group_id,sender_id,recipient_id,created_at")
+          .or(orParts.join(","))
+          .order("created_at", { ascending: false })
+          .limit(limit || 300);
+        if (error || !data) return {};
+        const latest = {};
+        data.forEach((m) => {
+          let key;
+          if (m.group_id) {
+            key = "g:" + m.group_id;
+          } else {
+            const other = m.sender_id === currentUserId ? m.recipient_id : m.sender_id;
+            if (!other) return;
+            key = "dm:" + [currentUserId, other].sort().join(":");
+          }
+          if (!latest[key] || m.created_at > latest[key]) latest[key] = m.created_at;
+        });
+        return latest;
       },
     };
   })();
@@ -3938,7 +4027,7 @@ function TodayScheduleModal({ userName, userPhoto, agenda, todayLabel, greeting,
   );
 }
 
-function ProfileEditModal({ name, photo, college, bio, socials, onSave, onClose }) {
+function ProfileEditModal({ name, photo, college, bio, socials, visibility, onSave, onClose }) {
   const [draftName, setDraftName] = useState(name || "");
   const [draftPhoto, setDraftPhoto] = useState(photo || null);
   const [draftCollege, setDraftCollege] = useState(college || "");
@@ -3946,6 +4035,7 @@ function ProfileEditModal({ name, photo, college, bio, socials, onSave, onClose 
   const [draftFacebook, setDraftFacebook] = useState(socials?.facebook || "");
   const [draftInstagram, setDraftInstagram] = useState(socials?.instagram || "");
   const [draftOtherLink, setDraftOtherLink] = useState(socials?.other || "");
+  const [draftVisibility, setDraftVisibility] = useState(visibility || "public");
   const [photoError, setPhotoError] = useState("");
   const fileRef = useRef(null);
 
@@ -4029,9 +4119,30 @@ function ProfileEditModal({ name, photo, college, bio, socials, onSave, onClose 
         className="w-full text-sm px-3 py-2 rounded-lg mb-3 tk-field"
         style={fieldStyle}
       />
+      <p className="text-xs mb-1" style={{ color: "var(--muted)" }}>College, bio ও সোশ্যাল লিংক কারা দেখবে</p>
+      <div className="flex gap-2 mb-3">
+        {[
+          { id: "public", label: "সবাই" },
+          { id: "friends", label: "শুধু বন্ধুরা" },
+          { id: "private", label: "কেউ না" },
+        ].map((opt) => (
+          <button key={opt.id} type="button" onClick={() => setDraftVisibility(opt.id)}
+            className="flex-1 text-xs px-2 py-1.5 rounded-lg"
+            style={{
+              border: "1px solid var(--border)",
+              background: draftVisibility === opt.id ? "var(--accent)" : "transparent",
+              color: draftVisibility === opt.id ? "#fff" : "var(--ink)",
+            }}>
+            {opt.label}
+          </button>
+        ))}
+      </div>
+      <p className="text-[11px] mb-3" style={{ color: "var(--muted)" }}>
+        নাম, ছবি ও প্রোগ্রেস % সবসময় Community-তে সবাই দেখতে পাবে — এই সেটিং শুধু College/Bio/সোশ্যাল লিংকের জন্য প্রযোজ্য।
+      </p>
       <button
         onClick={() => {
-          onSave(draftName, draftPhoto, draftCollege, draftBio, { facebook: draftFacebook, instagram: draftInstagram, other: draftOtherLink });
+          onSave(draftName, draftPhoto, draftCollege, draftBio, { facebook: draftFacebook, instagram: draftInstagram, other: draftOtherLink }, draftVisibility);
           onClose();
         }}
         className="w-full text-sm font-semibold px-3 py-2 rounded-lg"
@@ -7110,57 +7221,176 @@ function CommunityTab({ dark, userName, userPhoto }) {
 
 const COMMUNITY_GROUP_ID = "00000000-0000-0000-0000-000000000001";
 
+function convKeyForGroup(groupId) { return "g:" + groupId; }
+function convKeyForDM(myId, otherId) { return "dm:" + [myId, otherId].sort().join(":"); }
+
 function ChatHub({ dark, userName, userPhoto }) {
   const cs = window.cloudSync;
   const myId = cs.getUserId();
   const [directory, setDirectory] = useState([]);
   const [groups, setGroups] = useState([]);
+  const [friendMap, setFriendMap] = useState({}); // otherId -> { state, id }
+  const [incomingRequests, setIncomingRequests] = useState([]);
+  const [readState, setReadState] = useState({});
+  const [activity, setActivity] = useState({});
+  const [search, setSearch] = useState("");
   const [showNewGroup, setShowNewGroup] = useState(false);
+  const [showRequests, setShowRequests] = useState(false);
+  const [mobileThreadOpen, setMobileThreadOpen] = useState(false);
   const [active, setActive] = useState({ type: "group", groupId: COMMUNITY_GROUP_ID, name: "Community" });
 
   const loadSidebar = useCallback(async () => {
-    const [dir, gs] = await Promise.all([cs.fetchDirectory(), cs.fetchMyGroups()]);
+    const [dir, gs, fm, inc, rs] = await Promise.all([
+      cs.fetchDirectory(), cs.fetchMyGroups(), cs.fetchFriendStatusMap(), cs.fetchFriendRequestsIncoming(), cs.fetchReadState(),
+    ]);
     setDirectory(dir);
     setGroups(gs);
+    setFriendMap(fm);
+    setIncomingRequests(inc);
+    setReadState(rs);
+    const act = await cs.fetchRecentActivity(gs.map((g) => g.id));
+    setActivity(act);
   }, []);
 
   useEffect(() => { loadSidebar(); }, [loadSidebar]);
 
+  // re-poll activity periodically so unread dots stay fresh even without opening a thread
+  useEffect(() => {
+    const id = setInterval(async () => {
+      const act = await cs.fetchRecentActivity(groups.map((g) => g.id));
+      setActivity(act);
+    }, 20000);
+    return () => clearInterval(id);
+  }, [groups]);
+
+  function openConversation(conv) {
+    setActive(conv);
+    setMobileThreadOpen(true);
+    const key = conv.type === "group" ? convKeyForGroup(conv.groupId) : convKeyForDM(myId, conv.recipientId);
+    cs.markRead(key);
+    setReadState((prev) => ({ ...prev, [key]: new Date().toISOString() }));
+  }
+
+  function isUnread(key) {
+    const last = activity[key];
+    if (!last) return false;
+    const read = readState[key];
+    return !read || last > read;
+  }
+
+  function friendButton(uid) {
+    const info = friendMap[uid];
+    if (!info) {
+      return (
+        <button onClick={async (e) => { e.stopPropagation(); await cs.sendFriendRequest(uid); loadSidebar(); }}
+          className="text-[10px] px-1.5 py-0.5 rounded flex-shrink-0" style={{ border: "1px solid var(--border)", color: "var(--accent)" }}>
+          + বন্ধু
+        </button>
+      );
+    }
+    if (info.state === "pending_sent") return <span className="text-[10px] flex-shrink-0" style={{ color: dark ? "#888" : "#999" }}>পেন্ডিং</span>;
+    if (info.state === "pending_received") {
+      return (
+        <button onClick={async (e) => { e.stopPropagation(); await cs.respondFriendRequest(info.id, true); loadSidebar(); }}
+          className="text-[10px] px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: "var(--accent)", color: "#fff" }}>
+          গ্রহণ করুন
+        </button>
+      );
+    }
+    if (info.state === "friends") return <span className="text-[10px] flex-shrink-0" style={{ color: "var(--accent)" }}>✓ বন্ধু</span>;
+    return null;
+  }
+
+  const friendIds = Object.keys(friendMap).filter((uid) => friendMap[uid].state === "friends");
+  const filteredDirectory = directory.filter((d) => {
+    if (!d.user_id || d.user_id === myId) return false;
+    if (!search.trim()) return true;
+    return (d.name || "").toLowerCase().includes(search.trim().toLowerCase());
+  });
+
   return (
     <div className="flex flex-col sm:flex-row gap-4">
-      <div className="w-full sm:w-56 flex-shrink-0 space-y-1">
-        <button onClick={() => setActive({ type: "group", groupId: COMMUNITY_GROUP_ID, name: "Community" })}
-          className="w-full text-left text-sm px-3 py-2 rounded truncate"
+      <div className={`${mobileThreadOpen ? "hidden" : "block"} sm:block w-full sm:w-60 flex-shrink-0 space-y-1`}>
+        <button onClick={() => openConversation({ type: "group", groupId: COMMUNITY_GROUP_ID, name: "Community" })}
+          className="w-full text-left text-sm px-3 py-2 rounded truncate flex items-center justify-between"
           style={{ background: active.groupId === COMMUNITY_GROUP_ID ? "var(--accent)" : "transparent", color: active.groupId === COMMUNITY_GROUP_ID ? "#fff" : (dark ? "#ddd" : "#333") }}>
-          # Community
+          <span># Community</span>
+          {isUnread(convKeyForGroup(COMMUNITY_GROUP_ID)) && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: active.groupId === COMMUNITY_GROUP_ID ? "#fff" : "var(--accent)" }} />}
         </button>
         {groups.filter((g) => !g.is_public).map((g) => (
-          <button key={g.id} onClick={() => setActive({ type: "group", groupId: g.id, name: g.name })}
-            className="w-full text-left text-sm px-3 py-2 rounded truncate"
+          <button key={g.id} onClick={() => openConversation({ type: "group", groupId: g.id, name: g.name })}
+            className="w-full text-left text-sm px-3 py-2 rounded truncate flex items-center justify-between"
             style={{ background: active.groupId === g.id ? "var(--accent)" : "transparent", color: active.groupId === g.id ? "#fff" : (dark ? "#ddd" : "#333") }}>
-            # {g.name}
+            <span className="truncate"># {g.name}</span>
+            {isUnread(convKeyForGroup(g.id)) && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: active.groupId === g.id ? "#fff" : "var(--accent)" }} />}
           </button>
         ))}
         <button onClick={() => setShowNewGroup(true)} className="w-full text-left text-xs px-3 py-2 rounded" style={{ color: "var(--accent)" }}>
           + নতুন গ্রুপ
         </button>
 
+        <button onClick={() => setShowRequests(true)} className="w-full text-left text-xs px-3 py-2 rounded flex items-center justify-between" style={{ color: dark ? "#ddd" : "#333" }}>
+          <span>বন্ধুর অনুরোধ</span>
+          {incomingRequests.length > 0 && (
+            <span className="text-[10px] px-1.5 rounded-full" style={{ background: "var(--accent)", color: "#fff" }}>{incomingRequests.length}</span>
+          )}
+        </button>
+
+        {friendIds.length > 0 && (
+          <div className="pt-2 mt-2" style={{ borderTop: "1px solid var(--border)" }}>
+            <p className="text-xs px-3 mb-1" style={{ color: dark ? "#888" : "#999" }}>বন্ধুরা</p>
+            {friendIds.map((uid) => {
+              const p = directory.find((d) => d.user_id === uid);
+              const key = convKeyForDM(myId, uid);
+              return (
+                <button key={uid} onClick={() => openConversation({ type: "dm", recipientId: uid, name: p?.name || "Anonymous" })}
+                  className="w-full text-left text-xs px-3 py-1.5 rounded truncate flex items-center justify-between"
+                  style={{ background: active.recipientId === uid ? "var(--accent)" : "transparent", color: active.recipientId === uid ? "#fff" : (dark ? "#ddd" : "#666") }}>
+                  <span className="truncate">{p?.name || "Anonymous"}</span>
+                  {isUnread(key) && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: active.recipientId === uid ? "#fff" : "var(--accent)" }} />}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         <div className="pt-2 mt-2" style={{ borderTop: "1px solid var(--border)" }}>
-          <p className="text-xs px-3 mb-1" style={{ color: dark ? "#888" : "#999" }}>ডাইরেক্ট মেসেজ</p>
+          <input
+            value={search} onChange={(e) => setSearch(e.target.value)}
+            placeholder="মানুষ খুঁজুন…"
+            className="w-full text-xs px-3 py-1.5 rounded mb-1"
+            style={{ border: "1px solid var(--border)", background: dark ? "#14161A" : "#fafafa", color: dark ? "#fff" : "#241A12" }}
+          />
           <div className="max-h-40 overflow-y-auto">
-            {directory.filter((d) => d.user_id && d.user_id !== myId).map((d) => (
-              <button key={d.user_id} onClick={() => setActive({ type: "dm", recipientId: d.user_id, name: d.name || "Anonymous" })}
-                className="w-full text-left text-xs px-3 py-1.5 rounded truncate"
-                style={{ background: active.recipientId === d.user_id ? "var(--accent)" : "transparent", color: active.recipientId === d.user_id ? "#fff" : (dark ? "#aaa" : "#666") }}>
-                {d.name || "Anonymous"}
-              </button>
-            ))}
+            {filteredDirectory.length === 0 ? (
+              <p className="text-xs px-3 py-1" style={{ color: dark ? "#666" : "#999" }}>কেউ পাওয়া যায়নি।</p>
+            ) : (
+              filteredDirectory.map((d) => {
+                const key = convKeyForDM(myId, d.user_id);
+                return (
+                  <div key={d.user_id}
+                    onClick={() => openConversation({ type: "dm", recipientId: d.user_id, name: d.name || "Anonymous" })}
+                    className="w-full text-left text-xs px-3 py-1.5 rounded truncate flex items-center gap-2 cursor-pointer"
+                    style={{ background: active.recipientId === d.user_id ? "var(--accent)" : "transparent", color: active.recipientId === d.user_id ? "#fff" : (dark ? "#aaa" : "#666") }}>
+                    <span className="flex-1 truncate">{d.name || "Anonymous"}</span>
+                    {isUnread(key) && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: active.recipientId === d.user_id ? "#fff" : "var(--accent)" }} />}
+                    {friendButton(d.user_id)}
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       </div>
 
-      <div className="flex-1 min-w-0">
-        <ChatThread key={active.type + (active.groupId || active.recipientId)} dark={dark} userName={userName} userPhoto={userPhoto} active={active} />
+      <div className={`${mobileThreadOpen ? "block" : "hidden"} sm:block flex-1 min-w-0`}>
+        <ChatThread
+          key={active.type + (active.groupId || active.recipientId)}
+          dark={dark} userName={userName} userPhoto={userPhoto} active={active}
+          directory={directory}
+          onBack={() => setMobileThreadOpen(false)}
+          onLeftGroup={() => { loadSidebar(); openConversation({ type: "group", groupId: COMMUNITY_GROUP_ID, name: "Community" }); }}
+        />
       </div>
 
       {showNewGroup && (
@@ -7172,21 +7402,49 @@ function ChatHub({ dark, userName, userPhoto }) {
             const group = await cs.createGroup(name, memberIds);
             setShowNewGroup(false);
             await loadSidebar();
-            setActive({ type: "group", groupId: group.id, name: group.name });
+            openConversation({ type: "group", groupId: group.id, name: group.name });
           }}
         />
+      )}
+
+      {showRequests && (
+        <ModalShell title="বন্ধুর অনুরোধ" subtitle="যারা আপনাকে বন্ধু হিসেবে যোগ করতে চেয়েছে" onClose={() => setShowRequests(false)}>
+          {incomingRequests.length === 0 ? (
+            <p className="text-sm" style={{ color: "var(--muted)" }}>এখন কোনো নতুন অনুরোধ নেই।</p>
+          ) : (
+            <div className="space-y-2">
+              {incomingRequests.map((r) => {
+                const p = directory.find((d) => d.user_id === r.requester_id);
+                return (
+                  <div key={r.id} className="flex items-center justify-between text-sm px-2 py-2 rounded" style={{ border: "1px solid var(--border)" }}>
+                    <span>{p?.name || "Anonymous"}</span>
+                    <div className="flex gap-2">
+                      <button onClick={async () => { await cs.respondFriendRequest(r.id, true); setIncomingRequests((prev) => prev.filter((x) => x.id !== r.id)); loadSidebar(); }}
+                        className="text-xs px-2 py-1 rounded" style={{ background: "var(--accent)", color: "#fff" }}>গ্রহণ</button>
+                      <button onClick={async () => { await cs.respondFriendRequest(r.id, false); setIncomingRequests((prev) => prev.filter((x) => x.id !== r.id)); }}
+                        className="text-xs px-2 py-1 rounded" style={{ border: "1px solid var(--border)" }}>প্রত্যাখ্যান</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </ModalShell>
       )}
     </div>
   );
 }
 
-function ChatThread({ dark, userName, userPhoto, active }) {
+function ChatThread({ dark, userName, userPhoto, active, directory, onBack, onLeftGroup }) {
   const cs = window.cloudSync;
   const [messages, setMessages] = useState(null);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
+  const [showMembers, setShowMembers] = useState(false);
+  const [memberIds, setMemberIds] = useState([]);
   const listRef = useRef(null);
+  const myId = cs.getUserId();
 
   useEffect(() => {
     let cancelled = false;
@@ -7231,13 +7489,39 @@ function ChatThread({ dark, userName, userPhoto, active }) {
     }
   }
 
+  async function openMembers() {
+    const ids = await cs.fetchGroupMembers(active.groupId);
+    setMemberIds(ids);
+    setShowMembers(true);
+  }
+
+  async function leave() {
+    await cs.leaveGroup(active.groupId);
+    setShowMembers(false);
+    if (onLeftGroup) onLeftGroup();
+  }
+
+  const isCustomGroup = active.type === "group" && active.groupId !== COMMUNITY_GROUP_ID;
+
   return (
     <div className="rounded-lg overflow-hidden flex flex-col" style={{ border: "1px solid var(--border)", height: 420 }}>
       <div className="px-3 py-2 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border)", background: dark ? "#1c1f26" : "#fff" }}>
-        <span className="text-sm font-semibold truncate" style={{ color: dark ? "#fff" : "#241A12" }}>
-          {active.type === "group" ? "# " : ""}{active.name}
-        </span>
-        <span className="text-[10px] flex-shrink-0 ml-2" style={{ color: dark ? "#6b7280" : "#aaa" }}>মেসেজ ৭২ ঘণ্টা পর মুছে যায়</span>
+        <div className="flex items-center gap-2 min-w-0">
+          {onBack && (
+            <button onClick={onBack} className="sm:hidden text-sm flex-shrink-0" style={{ color: dark ? "#ddd" : "#333" }}>←</button>
+          )}
+          <span className="text-sm font-semibold truncate" style={{ color: dark ? "#fff" : "#241A12" }}>
+            {active.type === "group" ? "# " : ""}{active.name}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+          {isCustomGroup && (
+            <button onClick={openMembers} className="text-[10px] px-1.5 py-0.5 rounded" style={{ border: "1px solid var(--border)", color: dark ? "#aaa" : "#666" }}>
+              👥 মেম্বার
+            </button>
+          )}
+          <span className="text-[10px]" style={{ color: dark ? "#6b7280" : "#aaa" }}>৭২ ঘণ্টা পর মুছে যায়</span>
+        </div>
       </div>
       <div ref={listRef} className="flex-1 p-3 space-y-2 overflow-y-auto" style={{ background: dark ? "#14161A" : "#fafafa" }}>
         {messages === null ? (
@@ -7282,6 +7566,25 @@ function ChatThread({ dark, userName, userPhoto, active }) {
           পাঠান
         </button>
       </form>
+
+      {showMembers && (
+        <ModalShell title="গ্রুপ" subtitle={active.name} onClose={() => setShowMembers(false)}>
+          <p className="text-xs mb-2" style={{ color: "var(--muted)" }}>মেম্বাররা</p>
+          <div className="space-y-1 mb-4 max-h-48 overflow-y-auto">
+            {memberIds.map((uid) => {
+              const p = (directory || []).find((d) => d.user_id === uid);
+              return (
+                <div key={uid} className="text-sm px-2 py-1.5 rounded" style={{ background: dark ? "#1c1f26" : "#fafafa" }}>
+                  {uid === myId ? "আপনি" : (p?.name || "Anonymous")}
+                </div>
+              );
+            })}
+          </div>
+          <button onClick={leave} className="w-full text-sm font-semibold px-3 py-2 rounded-lg" style={{ background: "#A5473A", color: "#fff" }}>
+            গ্রুপ ছেড়ে দিন
+          </button>
+        </ModalShell>
+      )}
     </div>
   );
 }
@@ -7468,6 +7771,7 @@ function App() {
   const [userCollege, setUserCollegeState] = useState("");
   const [userBio, setUserBioState] = useState("");
   const [userSocials, setUserSocialsState] = useState({ facebook: "", instagram: "", other: "" });
+  const [userVisibility, setUserVisibilityState] = useState("public");
   const [nameModalOpen, setNameModalOpen] = useState(false);
   const [todayScheduleOpen, setTodayScheduleOpen] = useState(false);
   const [dayAdviceDismissed, setDayAdviceDismissed] = useState(false);
@@ -7521,6 +7825,7 @@ function App() {
       const collegeStored = await loadKey("user-college");
       const bioStored = await loadKey("user-bio");
       const socialsStored = await loadKey("user-socials");
+      const visibilityStored = await loadKey("user-visibility");
       const nameSkipped = await loadKey("user-name-skipped");
       setSubjectsData(sd);
       setCalendarData(cal);
@@ -7548,6 +7853,7 @@ function App() {
       setUserCollegeState(collegeStored || "");
       setUserBioState(bioStored || "");
       setUserSocialsState(socialsStored || { facebook: "", instagram: "", other: "" });
+      setUserVisibilityState(visibilityStored || "public");
       setLoaded(true);
 
       // First run: ask for a name once. Every run (including this one, once the
@@ -7592,6 +7898,7 @@ function App() {
         facebook: userSocials?.facebook || null,
         instagram: userSocials?.instagram || null,
         social_other: userSocials?.other || null,
+        visibility: userVisibility || "public",
         track,
         overall_progress: overallProgress,
         done_chapters: doneChapters,
@@ -7599,7 +7906,7 @@ function App() {
       });
     }, 1500);
     return () => clearTimeout(t);
-  }, [loaded, subjectsData, track, userName, userPhoto, userCollege, userBio, userSocials]);
+  }, [loaded, subjectsData, track, userName, userPhoto, userCollege, userBio, userSocials, userVisibility]);
 
   const saveUserName = async (name, photo) => {
     const trimmed = name.trim();
@@ -7615,18 +7922,20 @@ function App() {
     await saveKey("user-name-skipped", true);
     setTodayScheduleOpen(true);
   };
-  const saveProfile = async (name, photo, college, bio, socials) => {
+  const saveProfile = async (name, photo, college, bio, socials, visibility) => {
     const trimmed = name.trim();
     setUserNameState(trimmed);
     setUserPhotoState(photo || null);
     setUserCollegeState(college || "");
     setUserBioState(bio || "");
     setUserSocialsState(socials || { facebook: "", instagram: "", other: "" });
+    setUserVisibilityState(visibility || "public");
     await saveKey("user-name", trimmed);
     await saveKey("user-photo", photo || null);
     await saveKey("user-college", college || "");
     await saveKey("user-bio", bio || "");
     await saveKey("user-socials", socials || { facebook: "", instagram: "", other: "" });
+    await saveKey("user-visibility", visibility || "public");
   };
 
   const dismissDayAdvice = () => setDayAdviceDismissed(true);
@@ -8410,7 +8719,7 @@ function App() {
       )}
 
       {profileEditOpen && (
-        <ProfileEditModal name={userName} photo={userPhoto} college={userCollege} bio={userBio} socials={userSocials} onSave={saveProfile} onClose={() => setProfileEditOpen(false)} />
+        <ProfileEditModal name={userName} photo={userPhoto} college={userCollege} bio={userBio} socials={userSocials} visibility={userVisibility} onSave={saveProfile} onClose={() => setProfileEditOpen(false)} />
       )}
 
       {syncModal === "copy" && (
