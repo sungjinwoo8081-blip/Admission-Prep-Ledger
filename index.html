@@ -3860,7 +3860,7 @@ function GuideTab() {
 
       <Section icon={MoonStar} title="Settings (gear icon, top right)" accent="#7A2E28">
         <ul className="list-none">
-          <GuideRow><b>Theme</b> — 5 options: Sunlit Paper and Night Hunt (the original light/dark pair), plus three flavor themes — Spider-Verse Pop (comic halftone), Shonen Energy (neon gradient), and Spider-Noir (moody spotlight). Pick any of the 5 swatches; your choice is saved and reloads automatically.</GuideRow>
+          <GuideRow><b>Theme</b> — 5 options: Golden Hour and Blush Quartz (light), Deep Tide, Neon Orchid, and Emerald Noir (dark). Pick any of the 5 swatches; your choice is saved and reloads automatically.</GuideRow>
           <GuideRow><b>Background</b> — upload your own background image; it's saved locally with everything else.</GuideRow>
           <GuideRow><b>Reminders</b> — browser notifications for an unstarted daily plan or overdue revisions. Only fires while this tab is open.</GuideRow>
           <GuideRow><b>Week starts on</b> — pick which day your weekly plan (Routine tab) treats as the start of the week.</GuideRow>
@@ -7339,11 +7339,11 @@ function buildTodayAgenda({ todayStr, calendarData, routines, routineChecks, exa
 }
 
 const THEMES = [
-  { id: "light", label: "Sunlit Paper", family: "light", swatch: "#C6541A" },
-  { id: "dark", label: "Night Hunt", family: "dark", swatch: "#E8792F" },
-  { id: "spiderverse", label: "Spider-Verse Pop", family: "light", swatch: "#E23636" },
-  { id: "shonen", label: "Shonen Energy", family: "dark", swatch: "#FF4FA3" },
-  { id: "noir", label: "Spider-Noir", family: "dark", swatch: "#C41E3A" },
+  { id: "golden", label: "Golden Hour", family: "light", swatch: "#C2571E" },
+  { id: "tide", label: "Deep Tide", family: "dark", swatch: "#2FB6C4" },
+  { id: "quartz", label: "Blush Quartz", family: "light", swatch: "#D6577B" },
+  { id: "orchid", label: "Neon Orchid", family: "dark", swatch: "#B84FE0" },
+  { id: "emerald", label: "Emerald Noir", family: "dark", swatch: "#2FA876" },
 ];
 const THEME_IDS = THEMES.map((t) => t.id);
 
@@ -7952,7 +7952,7 @@ function App() {
   const [officialDates, setOfficialDatesState] = useState({ engineering: "", medical: "", varsity: "", iba: "" });
   const [track, setTrackState] = useState("engineering");
   const [dark, setDark] = useState(false);
-  const [themeName, setThemeNameState] = useState("light");
+  const [themeName, setThemeNameState] = useState("golden");
   const [bgImage, setBgImage] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [syncModal, setSyncModal] = useState(null); // null | "copy" | "paste"
@@ -8030,7 +8030,7 @@ function App() {
       const examRoutineChecksStored = (await loadKey("exam-routine-checks")) || {};
       const weeklyPlansStored = (await loadKey("weekly-plans")) || {};
       const dailyChecksStored = (await loadKey("daily-checks")) || {};
-      const settings = (await loadKey("app-settings")) || { track: "engineering", dark: false, theme: "light", bgImage: null, predictedDates: { engineering: "", medical: "", varsity: "", iba: "" }, officialDates: { engineering: "", medical: "", varsity: "", iba: "" }, remindersOn: false, weekStartDay: 0, dailyHourThreshold: 4 };
+      const settings = (await loadKey("app-settings")) || { track: "engineering", dark: false, theme: "golden", bgImage: null, predictedDates: { engineering: "", medical: "", varsity: "", iba: "" }, officialDates: { engineering: "", medical: "", varsity: "", iba: "" }, remindersOn: false, weekStartDay: 0, dailyHourThreshold: 4 };
       const nameStored = await loadKey("user-name");
       const photoStored = await loadKey("user-photo");
       const collegeStored = await loadKey("user-college");
@@ -8054,7 +8054,7 @@ function App() {
       setDailyHourThresholdState(typeof settings.dailyHourThreshold === "number" ? settings.dailyHourThreshold : 4);
       setTrackState(settings.track || "engineering");
       // migrate: older saves only have `dark` (boolean); newer saves have `theme` (one of THEME_IDS)
-      const migratedTheme = THEME_IDS.includes(settings.theme) ? settings.theme : (settings.dark ? "dark" : "light");
+      const migratedTheme = THEME_IDS.includes(settings.theme) ? settings.theme : (settings.dark ? "tide" : "golden");
       setThemeNameState(migratedTheme);
       setDark(THEMES.find((t) => t.id === migratedTheme)?.family === "dark");
       setBgImage(settings.bgImage || null);
@@ -8232,41 +8232,41 @@ function App() {
 
   useEffect(() => {
     const BG_COLORS = {
-      light: "#F1EFE6", dark: "#07080A",
-      spiderverse: "#F5F0E6", shonen: "#0d0a1e", noir: "#0A0E14",
+      golden: "#F6EDDD", tide: "#0B1220",
+      quartz: "#F7ECEF", orchid: "#160B24", emerald: "#0A120E",
     };
     const BG_GRADIENTS = {
-      light: [
-        "radial-gradient(circle at 12% 18%, rgba(59,76,155,0.35), transparent 40%)",
-        "radial-gradient(circle at 85% 12%, rgba(31,111,92,0.35), transparent 45%)",
-        "radial-gradient(circle at 25% 88%, rgba(150,116,31,0.3), transparent 45%)",
-        "radial-gradient(circle at 92% 82%, rgba(140,59,46,0.32), transparent 45%)",
+      golden: [
+        "radial-gradient(circle at 12% 18%, rgba(194,87,30,0.28), transparent 40%)",
+        "radial-gradient(circle at 85% 12%, rgba(31,111,92,0.22), transparent 45%)",
+        "radial-gradient(circle at 25% 88%, rgba(150,116,31,0.24), transparent 45%)",
+        "radial-gradient(circle at 92% 82%, rgba(140,59,46,0.26), transparent 45%)",
       ],
-      dark: [
-        "radial-gradient(circle at 15% 15%, rgba(232,163,61,0.16), transparent 42%)",
-        "radial-gradient(circle at 85% 10%, rgba(90,110,140,0.14), transparent 45%)",
-        "radial-gradient(circle at 25% 90%, rgba(232,163,61,0.10), transparent 50%)",
-        "radial-gradient(circle at 92% 85%, rgba(60,70,90,0.18), transparent 45%)",
+      tide: [
+        "radial-gradient(circle at 15% 15%, rgba(47,182,196,0.18), transparent 42%)",
+        "radial-gradient(circle at 85% 10%, rgba(90,120,180,0.14), transparent 45%)",
+        "radial-gradient(circle at 25% 90%, rgba(47,182,196,0.12), transparent 50%)",
+        "radial-gradient(circle at 92% 85%, rgba(60,90,120,0.18), transparent 45%)",
       ],
-      spiderverse: [
-        "radial-gradient(circle at 12% 15%, rgba(255,46,154,0.14), transparent 40%)",
-        "radial-gradient(circle at 88% 10%, rgba(0,194,209,0.16), transparent 45%)",
-        "radial-gradient(circle at 20% 90%, rgba(255,212,0,0.12), transparent 45%)",
-        "radial-gradient(circle at 92% 85%, rgba(226,54,54,0.14), transparent 45%)",
+      quartz: [
+        "radial-gradient(circle at 12% 15%, rgba(214,87,123,0.20), transparent 40%)",
+        "radial-gradient(circle at 88% 10%, rgba(180,120,200,0.16), transparent 45%)",
+        "radial-gradient(circle at 20% 90%, rgba(240,184,198,0.20), transparent 45%)",
+        "radial-gradient(circle at 92% 85%, rgba(214,87,123,0.14), transparent 45%)",
       ],
-      shonen: [
-        "radial-gradient(circle at 15% 12%, rgba(255,107,53,0.20), transparent 42%)",
-        "radial-gradient(circle at 85% 10%, rgba(61,219,255,0.16), transparent 45%)",
-        "radial-gradient(circle at 22% 90%, rgba(255,79,163,0.16), transparent 48%)",
-        "radial-gradient(circle at 90% 88%, rgba(255,107,53,0.14), transparent 45%)",
+      orchid: [
+        "radial-gradient(circle at 15% 12%, rgba(184,79,224,0.20), transparent 42%)",
+        "radial-gradient(circle at 85% 10%, rgba(61,120,255,0.14), transparent 45%)",
+        "radial-gradient(circle at 22% 90%, rgba(184,79,224,0.16), transparent 48%)",
+        "radial-gradient(circle at 90% 88%, rgba(120,60,180,0.16), transparent 45%)",
       ],
-      noir: [
-        "radial-gradient(circle at 50% 0%, rgba(74,111,165,0.18), transparent 55%)",
-        "radial-gradient(circle at 85% 80%, rgba(196,30,58,0.10), transparent 45%)",
-        "radial-gradient(circle at 10% 85%, rgba(74,111,165,0.08), transparent 45%)",
+      emerald: [
+        "radial-gradient(circle at 50% 0%, rgba(47,168,118,0.18), transparent 55%)",
+        "radial-gradient(circle at 85% 80%, rgba(47,168,118,0.10), transparent 45%)",
+        "radial-gradient(circle at 10% 85%, rgba(74,165,111,0.10), transparent 45%)",
       ],
     };
-    const bgColor = BG_COLORS[themeName] || (dark ? "#07080A" : "#F1EFE6");
+    const bgColor = BG_COLORS[themeName] || (dark ? "#0B1220" : "#F6EDDD");
     if (bgImage) {
       document.body.style.backgroundImage = `url("${bgImage}")`;
       document.body.style.backgroundSize = "cover";
@@ -8274,7 +8274,7 @@ function App() {
       document.body.style.backgroundAttachment = "fixed";
       document.body.style.backgroundRepeat = "no-repeat";
     } else {
-      document.body.style.backgroundImage = (BG_GRADIENTS[themeName] || BG_GRADIENTS[dark ? "dark" : "light"]).join(", ");
+      document.body.style.backgroundImage = (BG_GRADIENTS[themeName] || BG_GRADIENTS[dark ? "tide" : "golden"]).join(", ");
       document.body.style.backgroundSize = "cover";
       document.body.style.backgroundAttachment = "fixed";
       document.body.style.backgroundRepeat = "no-repeat";
@@ -8620,56 +8620,52 @@ function App() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&family=Anton&family=Archivo+Black&family=Bebas+Neue&family=Zilla+Slab:wght@500;700&display=swap');
 
-        .theme-light {
-          --bg: #F3E8D3; --panel: rgba(255,250,240,0.6); --surface: rgba(255,250,240,0.78);
-          --ink-strong: #241A12; --on-ink: #FBF1DF; --ink: #2B1D12; --ink-soft: #4A3624;
+        .theme-golden {
+          --bg: #F6EDDD; --panel: rgba(255,250,240,0.6); --surface: rgba(255,250,240,0.78);
+          --ink-strong: #2B1D12; --on-ink: #FBF1DF; --ink: #2B1D12; --ink-soft: #4A3624;
           --muted: #7A5C3E; --faint: #A98F6E; --muted-on-dark: #E8C9A0;
-          --border: rgba(184,80,26,0.35); --divider: rgba(150,110,70,0.35);
-          --faint-icon: #D8BE9A; --faint-num: #C9AB80; --accent: #C6541A;
-          --overlay: rgba(243,232,211,0.5);
+          --border: rgba(194,87,30,0.35); --divider: rgba(150,110,70,0.35);
+          --faint-icon: #D8BE9A; --faint-num: #C9AB80; --accent: #C2571E;
+          --overlay: rgba(246,237,221,0.5);
           --title-font: 'Lora', serif;
         }
-        .theme-dark {
-          --bg: #0C0A08; --panel: rgba(26,20,14,0.55); --surface: rgba(255,255,255,0.05);
-          --ink-strong: #050403; --on-ink: #FBEEDC; --ink: #F0DFC8; --ink-soft: #CBB495;
-          --muted: #9C8467; --faint: #6B5A45; --muted-on-dark: #E0AE72;
-          --border: rgba(232,121,47,0.22); --divider: rgba(255,255,255,0.09);
-          --faint-icon: rgba(255,255,255,0.22); --faint-num: rgba(255,255,255,0.3); --accent: #E8792F;
-          --overlay: rgba(6,4,3,0.62);
+        .theme-tide {
+          --bg: #0B1220; --panel: rgba(18,28,42,0.55); --surface: rgba(255,255,255,0.05);
+          --ink-strong: #050B12; --on-ink: #E9F6F8; --ink: #DCEEF1; --ink-soft: #A9C4CB;
+          --muted: #6F8A92; --faint: #445961; --muted-on-dark: #7FDCE6;
+          --border: rgba(47,182,196,0.28); --divider: rgba(255,255,255,0.08);
+          --faint-icon: rgba(255,255,255,0.2); --faint-num: rgba(255,255,255,0.28); --accent: #2FB6C4;
+          --overlay: rgba(6,10,16,0.62);
           --title-font: 'Lora', serif;
         }
-        .theme-spiderverse {
-          --bg: #F5F0E6; --panel: rgba(255,255,255,0.72); --surface: rgba(255,255,255,0.85);
-          --ink-strong: #0B0B0F; --on-ink: #FBF1DF; --ink: #0B0B0F; --ink-soft: #2A2A33;
-          --muted: #5A5A66; --faint: #9A9AA6; --muted-on-dark: #FFD400;
-          --border: rgba(11,11,15,0.35); --divider: rgba(11,11,15,0.18);
-          --faint-icon: #C9C4B4; --faint-num: #B8B2A0; --accent: #E23636;
-          --overlay: rgba(245,240,230,0.45);
-          --title-font: 'Anton', sans-serif;
-          background-image: radial-gradient(rgba(11,11,15,0.06) 1px, transparent 1px);
-          background-size: 11px 11px;
+        .theme-quartz {
+          --bg: #F7ECEF; --panel: rgba(255,248,250,0.65); --surface: rgba(255,248,250,0.8);
+          --ink-strong: #2E1A22; --on-ink: #FDF1F4; --ink: #2E1A22; --ink-soft: #5A3A44;
+          --muted: #8C6570; --faint: #BB98A0; --muted-on-dark: #F0B8C6;
+          --border: rgba(214,87,123,0.32); --divider: rgba(180,120,135,0.3);
+          --faint-icon: #E7C6CE; --faint-num: #DDB4BE; --accent: #D6577B;
+          --overlay: rgba(247,236,239,0.5);
+          --title-font: 'Lora', serif;
         }
-        .theme-shonen {
-          --bg: #14102B; --panel: rgba(36,26,74,0.55); --surface: rgba(255,255,255,0.055);
-          --ink-strong: #0d0a1e; --on-ink: #FFF8ED; --ink: #FFF8ED; --ink-soft: #cfc9ee;
-          --muted: #9d94c9; --faint: #6b6294; --muted-on-dark: #FF6B35;
-          --border: rgba(255,79,163,0.28); --divider: rgba(255,255,255,0.09);
-          --faint-icon: rgba(255,255,255,0.25); --faint-num: rgba(255,255,255,0.32); --accent: #FF4FA3;
-          --overlay: rgba(13,10,30,0.55);
-          --title-font: 'Bebas Neue', sans-serif;
+        .theme-orchid {
+          --bg: #160B24; --panel: rgba(40,20,60,0.55); --surface: rgba(255,255,255,0.055);
+          --ink-strong: #0D0616; --on-ink: #F7ECFB; --ink: #EEDFF5; --ink-soft: #C6AAD6;
+          --muted: #8E71A3; --faint: #5B4670; --muted-on-dark: #E29CF0;
+          --border: rgba(184,79,224,0.3); --divider: rgba(255,255,255,0.09);
+          --faint-icon: rgba(255,255,255,0.22); --faint-num: rgba(255,255,255,0.3); --accent: #B84FE0;
+          --overlay: rgba(13,6,22,0.6);
+          --title-font: 'Lora', serif;
         }
-        .theme-noir {
-          --bg: #0A0E14; --panel: rgba(17,24,38,0.6); --surface: rgba(255,255,255,0.04);
-          --ink-strong: #05070b; --on-ink: #E8E4D9; --ink: #E8E4D9; --ink-soft: #8B95A1;
-          --muted: #6c7583; --faint: #454e5c; --muted-on-dark: #4A6FA5;
-          --border: rgba(74,111,165,0.3); --divider: rgba(255,255,255,0.07);
-          --faint-icon: rgba(255,255,255,0.16); --faint-num: rgba(255,255,255,0.22); --accent: #C41E3A;
-          --overlay: rgba(5,7,11,0.6);
-          --title-font: 'Zilla Slab', serif;
+        .theme-emerald {
+          --bg: #0A120E; --panel: rgba(16,32,24,0.55); --surface: rgba(255,255,255,0.045);
+          --ink-strong: #040A07; --on-ink: #E9F5EE; --ink: #DDEDE3; --ink-soft: #9FC1AC;
+          --muted: #628270; --faint: #3E5548; --muted-on-dark: #6FD8A0;
+          --border: rgba(47,168,118,0.28); --divider: rgba(255,255,255,0.07);
+          --faint-icon: rgba(255,255,255,0.18); --faint-num: rgba(255,255,255,0.25); --accent: #2FA876;
+          --overlay: rgba(5,10,8,0.6);
+          --title-font: 'Lora', serif;
         }
         .app-title { font-family: var(--title-font); }
-        .theme-spiderverse .app-title { text-shadow: 2px 2px 0 #00C2D1, -1.5px -1.5px 0 #FF2E9A; letter-spacing: 0.01em; text-transform: uppercase; }
-        .theme-shonen .app-title { background: linear-gradient(90deg, #FF6B35, #FF4FA3, #3DDBFF); -webkit-background-clip: text; background-clip: text; color: transparent; letter-spacing: 0.03em; filter: drop-shadow(0 0 10px rgba(255,79,163,0.35)); }
         .tk-field { background: var(--surface) !important; color: var(--ink); border-color: var(--border) !important; }
         .tk-field::placeholder { color: var(--faint); }
         select.tk-field option { background: var(--bg); color: var(--ink); }
@@ -8905,22 +8901,32 @@ function App() {
               overflowY: "auto", boxShadow: "0 12px 32px rgba(0,0,0,0.35)"
             }}>
               <p className="text-xs mb-1.5" style={{ color: "var(--muted)" }}>Theme</p>
-              <div className="grid grid-cols-5 gap-1.5 mb-3">
-                {THEMES.map((t) => (
-                  <button key={t.id} onClick={() => setThemeName(t.id)} title={t.label}
-                    className="flex flex-col items-center gap-1 py-1.5 rounded"
-                    style={{
-                      background: "var(--surface)",
-                      border: themeName === t.id ? "2px solid var(--accent)" : "1px solid var(--border)",
-                    }}>
-                    <span style={{ width: 16, height: 16, borderRadius: "50%", background: t.swatch, boxShadow: themeName === t.id ? "0 0 0 2px var(--panel)" : "none" }} />
-                    {themeName === t.id && <Check size={10} color="var(--accent)" />}
-                  </button>
-                ))}
+              <div className="grid grid-cols-3 gap-1.5 mb-3">
+                {THEMES.map((t) => {
+                  const isActive = themeName === t.id;
+                  return (
+                    <button key={t.id} onClick={() => setThemeName(t.id)} title={t.label}
+                      className="flex flex-col items-center gap-1 py-2 px-1 rounded-lg"
+                      style={{
+                        background: isActive ? `linear-gradient(160deg, ${t.swatch}26, transparent)` : "var(--surface)",
+                        border: isActive ? `1px solid ${t.swatch}` : "1px solid var(--border)",
+                        boxShadow: isActive ? `0 6px 18px ${t.swatch}40, 0 0 0 1px ${t.swatch}55 inset` : "none",
+                        transform: isActive ? "translateY(-2px)" : "none",
+                        transition: "all 0.18s ease",
+                      }}>
+                      <span style={{
+                        width: 26, height: 26, borderRadius: 8,
+                        background: `linear-gradient(135deg, ${t.swatch}, ${t.swatch}99)`,
+                        boxShadow: isActive ? `0 0 0 2px var(--panel), 0 0 10px ${t.swatch}80` : "0 1px 3px rgba(0,0,0,0.25)",
+                        display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                      }}>
+                        {isActive && <Check size={12} color="#fff" />}
+                      </span>
+                      <span className="text-[9.5px] text-center leading-tight" style={{ color: isActive ? "var(--ink)" : "var(--faint)", fontFamily: "Inter, sans-serif", fontWeight: isActive ? 700 : 500 }}>{t.label}</span>
+                    </button>
+                  );
+                })}
               </div>
-              <p className="text-xs mb-3 -mt-2" style={{ color: "var(--ink)", fontFamily: "Inter, sans-serif" }}>
-                {THEMES.find((t) => t.id === themeName)?.label}
-              </p>
 
               <button onClick={() => { setSettingsOpen(false); setProfileEditOpen(true); }}
                 className="w-full flex items-center gap-2 text-xs px-2 py-1.5 rounded mb-3"
