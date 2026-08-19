@@ -3863,6 +3863,7 @@ function GuideTab() {
           <GuideRow><b>Theme</b> — 5 options: Golden Hour and Blush Quartz (light), Deep Tide, Neon Orchid, and Emerald Noir (dark). Pick any of the 5 swatches; your choice is saved and reloads automatically.</GuideRow>
           <GuideRow><b>Background</b> — upload your own background image; it's saved locally with everything else.</GuideRow>
           <GuideRow><b>Reminders</b> — browser notifications for an unstarted daily plan or overdue revisions. Only fires while this tab is open.</GuideRow>
+          <GuideRow><b>Daily popups</b> — off by default. Turns on the "today's schedule" card (on app open), yesterday's recap, and "the scroll for today" pick. Turn on if you want the nudges; leave off for a quieter app.</GuideRow>
           <GuideRow><b>Week starts on</b> — pick which day your weekly plan (Routine tab) treats as the start of the week.</GuideRow>
           <GuideRow><b>Backup &amp; Restore</b> — export your data as JSON (full backup) or CSV (spreadsheet-friendly). Import JSON to restore. "Copy/Paste to sync" moves your data to another device without a file.</GuideRow>
           <GuideRow><b>Reset all data</b> — wipes everything in this browser. Export a backup first.</GuideRow>
@@ -6394,7 +6395,7 @@ const OVERVIEW_TOUR_STEPS = [
   { target: null, title: "এই গাইড আবার দেখতে চাইলে", body: "উপরে ট্র্যাক সিলেক্টরের পাশেই 'guide' বাটন আছে — যেকোনো সময় চাপলেই এই ট্যুরটা আবার শুরু হয়ে যাবে। বাকি ট্যাবগুলোতে (Study, Calendar, Routine, Exam Tracker, Analytics, Community) গেলেও প্রথমবার নিজে থেকেই একটা গাইড শুরু হবে।" },
 ];
 
-function OverviewTab({ subjectsData, calendarData, setDayData, mixedExams, routines, routineChecks, setRoutineChecks, examRoutines, examRoutineChecks, setExamRoutineChecks, predictedDates, setPredictedDate, officialDates, setOfficialDate, track, setTrack, goTo, weeklyPlans, weekStartDay, dailyChecks, setDailyChecks }) {
+function OverviewTab({ subjectsData, calendarData, setDayData, mixedExams, routines, routineChecks, setRoutineChecks, examRoutines, examRoutineChecks, setExamRoutineChecks, predictedDates, setPredictedDate, officialDates, setOfficialDate, track, setTrack, goTo, weeklyPlans, weekStartDay, dailyChecks, setDailyChecks, dailyPopupsOn, otherPopupsOpen }) {
   const visibleSubjects = SUBJECTS.filter((s) => TRACKS.find((t) => t.id === track).subjects.includes(s.id));
   const predictedDate = predictedDates[track] || "";
   const officialDate = officialDates[track] || "";
@@ -6571,7 +6572,7 @@ function OverviewTab({ subjectsData, calendarData, setDayData, mixedExams, routi
 
   return (
     <div>
-      {!scrollDismissed && todaysDuePlans.length > 0 && (
+      {dailyPopupsOn && !scrollDismissed && todaysDuePlans.length > 0 && (
         <div className="fixed inset-0 z-40 flex items-center justify-center p-4" style={{ background: "var(--overlay)" }}
           onClick={(e) => { if (e.target === e.currentTarget) dismissScroll(); }}>
           <div className="w-full text-center rounded-xl p-6" style={{ maxWidth: 360, background: "var(--panel)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", border: "1px solid var(--accent)" }}>
@@ -6801,7 +6802,7 @@ function OverviewTab({ subjectsData, calendarData, setDayData, mixedExams, routi
         </div>
       </div>
 
-      <TourGuide tourId="overview" steps={OVERVIEW_TOUR_STEPS} active={tour.active} onDone={tour.stop} />
+      <TourGuide tourId="overview" steps={OVERVIEW_TOUR_STEPS} active={tour.active && !otherPopupsOpen && !(dailyPopupsOn && !scrollDismissed)} onDone={tour.stop} />
     </div>
   );
 }
@@ -8134,6 +8135,7 @@ function App() {
   const [dailyHourThreshold, setDailyHourThresholdState] = useState(4);
   const saveTimers = useRef({});
   const [remindersOn, setRemindersOn] = useState(false);
+  const [dailyPopupsOn, setDailyPopupsOnState] = useState(false);
   const [notifPermission, setNotifPermission] = useState(typeof Notification !== "undefined" ? Notification.permission : "unsupported");
   const [motivationQuote, setMotivationQuote] = useState("");
   const [userName, setUserNameState] = useState("");
@@ -8189,7 +8191,7 @@ function App() {
       const examRoutineChecksStored = (await loadKey("exam-routine-checks")) || {};
       const weeklyPlansStored = (await loadKey("weekly-plans")) || {};
       const dailyChecksStored = (await loadKey("daily-checks")) || {};
-      const settings = (await loadKey("app-settings")) || { track: "engineering", dark: false, theme: "golden", bgImage: null, predictedDates: { engineering: "", medical: "", varsity: "", iba: "" }, officialDates: { engineering: "", medical: "", varsity: "", iba: "" }, remindersOn: false, weekStartDay: 0, dailyHourThreshold: 4 };
+      const settings = (await loadKey("app-settings")) || { track: "engineering", dark: false, theme: "golden", bgImage: null, predictedDates: { engineering: "", medical: "", varsity: "", iba: "" }, officialDates: { engineering: "", medical: "", varsity: "", iba: "" }, remindersOn: false, weekStartDay: 0, dailyHourThreshold: 4, dailyPopupsOn: false };
       const nameStored = await loadKey("user-name");
       const photoStored = await loadKey("user-photo");
       const collegeStored = await loadKey("user-college");
@@ -8220,6 +8222,7 @@ function App() {
       setPredictedDatesState(settings.predictedDates || { engineering: "", medical: "", varsity: "", iba: "" });
       setOfficialDatesState(settings.officialDates || { engineering: "", medical: "", varsity: "", iba: "" });
       setRemindersOn(!!settings.remindersOn);
+      setDailyPopupsOnState(!!settings.dailyPopupsOn);
       setUserNameState(nameStored || "");
       setUserPhotoState(photoStored || null);
       setUserCollegeState(collegeStored || "");
@@ -8229,10 +8232,11 @@ function App() {
       setLoaded(true);
 
       // First run: ask for a name once. Every run (including this one, once the
-      // name step is out of the way): pop up today's schedule.
+      // name step is out of the way): pop up today's schedule — but only if the
+      // user has opted into daily popups (default off).
       if (!nameStored && !nameSkipped) {
         setNameModalOpen(true);
-      } else {
+      } else if (settings.dailyPopupsOn) {
         setTodayScheduleOpen(true);
       }
 
@@ -8287,12 +8291,12 @@ function App() {
     setNameModalOpen(false);
     await saveKey("user-name", trimmed);
     await saveKey("user-photo", photo || null);
-    setTodayScheduleOpen(true);
+    if (dailyPopupsOn) setTodayScheduleOpen(true);
   };
   const skipUserName = async () => {
     setNameModalOpen(false);
     await saveKey("user-name-skipped", true);
-    setTodayScheduleOpen(true);
+    if (dailyPopupsOn) setTodayScheduleOpen(true);
   };
   const saveProfile = async (name, photo, college, bio, socials, visibility) => {
     const trimmed = name.trim();
@@ -8313,8 +8317,12 @@ function App() {
   const dismissDayAdvice = () => setDayAdviceDismissed(true);
 
   const saveSettings = (patch) => {
-    const next = { track, dark, theme: themeName, bgImage, predictedDates, officialDates, remindersOn, weekStartDay, dailyHourThreshold, ...patch };
+    const next = { track, dark, theme: themeName, bgImage, predictedDates, officialDates, remindersOn, weekStartDay, dailyHourThreshold, dailyPopupsOn, ...patch };
     saveKey("app-settings", next);
+  };
+
+  const toggleDailyPopups = () => {
+    setDailyPopupsOnState((v) => { const next = !v; saveSettings({ dailyPopupsOn: next }); return next; });
   };
 
   const setWeekStartDay = (v) => {
@@ -9126,6 +9134,15 @@ function App() {
               </div>
 
               <div className="pt-2 mb-1" style={{ borderTop: "1px solid var(--border)" }}>
+                <p className="text-xs font-semibold mb-1" style={{ color: "var(--ink)", letterSpacing: "0.03em" }}>DAILY POPUPS</p>
+                <p className="text-xs mb-2" style={{ color: "var(--faint)" }}>The "today's schedule" card, yesterday's recap, and "the scroll for today" pick — off by default so they don't get in the way. Turn on if you want them.</p>
+                <button onClick={toggleDailyPopups} className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold px-2 py-1.5 rounded mb-1"
+                  style={{ background: dailyPopupsOn ? "var(--ink-strong)" : "var(--surface)", color: dailyPopupsOn ? "var(--on-ink)" : "var(--ink)", border: "1px solid var(--border)" }}>
+                  <Star size={12} /> {dailyPopupsOn ? "Daily popups on — tap to turn off" : "Daily popups off — tap to turn on"}
+                </button>
+              </div>
+
+              <div className="pt-2 mb-1" style={{ borderTop: "1px solid var(--border)" }}>
                 <p className="text-xs font-semibold mb-1" style={{ color: "var(--ink)", letterSpacing: "0.03em" }}>WEEK STARTS ON</p>
                 <p className="text-xs mb-2" style={{ color: "var(--faint)" }}>Controls the Routine tab's "Plan for the week" boundaries.</p>
                 <div className="flex gap-1 mb-3">
@@ -9222,7 +9239,7 @@ function App() {
         />
       )}
 
-      {!nameModalOpen && !todayScheduleOpen && !dayAdviceDismissed && (
+      {dailyPopupsOn && !nameModalOpen && !todayScheduleOpen && !dayAdviceDismissed && (
         <div className="fixed inset-0 z-40 flex items-center justify-center p-4" style={{ background: "var(--overlay)" }}
           onClick={(e) => { if (e.target === e.currentTarget) dismissDayAdvice(); }}>
           <div className="w-full text-center rounded-xl p-6" style={{ maxWidth: 360, background: "var(--panel)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", border: "1px solid var(--accent)" }}>
@@ -9302,7 +9319,7 @@ function App() {
         {!loaded ? (
           <p style={{ color: "var(--faint)" }}>loading your ledger…</p>
         ) : tab === "overview" ? (
-          <OverviewTab subjectsData={subjectsData} calendarData={calendarData} setDayData={setDayData} mixedExams={mixedExams} routines={routines} routineChecks={routineChecks} setRoutineChecks={setRoutineChecks} examRoutines={examRoutines} examRoutineChecks={examRoutineChecks} setExamRoutineChecks={setExamRoutineChecks} predictedDates={predictedDates} setPredictedDate={setPredictedDate} officialDates={officialDates} setOfficialDate={setOfficialDate} track={track} setTrack={setTrack} goTo={goTo} weeklyPlans={weeklyPlans} weekStartDay={weekStartDay} dailyChecks={dailyChecks} setDailyChecks={setDailyChecks} />
+          <OverviewTab subjectsData={subjectsData} calendarData={calendarData} setDayData={setDayData} mixedExams={mixedExams} routines={routines} routineChecks={routineChecks} setRoutineChecks={setRoutineChecks} examRoutines={examRoutines} examRoutineChecks={examRoutineChecks} setExamRoutineChecks={setExamRoutineChecks} predictedDates={predictedDates} setPredictedDate={setPredictedDate} officialDates={officialDates} setOfficialDate={setOfficialDate} track={track} setTrack={setTrack} goTo={goTo} weeklyPlans={weeklyPlans} weekStartDay={weekStartDay} dailyChecks={dailyChecks} setDailyChecks={setDailyChecks} dailyPopupsOn={dailyPopupsOn} otherPopupsOpen={nameModalOpen || todayScheduleOpen || (dailyPopupsOn && !dayAdviceDismissed)} />
         ) : tab === "chapters" ? (
           <ChaptersTab subjectsData={subjectsData} setChapterData={setChapterData} track={track} setTrack={setTrack} dark={dark} calendarData={calendarData} addChapterPlan={addChapterPlan} removeChapterPlan={removeChapterPlan} pendingOpen={pendingOpen} clearPendingOpen={() => setPendingOpen(null)} dailyChecks={dailyChecks} setDailyChecks={setDailyChecks} userName={userName} userPhoto={userPhoto} bgImage={bgImage} />
         ) : tab === "calendar" ? (
