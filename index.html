@@ -8761,9 +8761,11 @@ function App() {
         </div>
 
         <div className="sidebar-footer">
-          <div onClick={() => setProfilePopoverOpen((o) => !o)} role="button" tabIndex={0} title={sidebarCollapsed ? (userName || "Profile") : undefined} className="sidebar-item" style={{ position: "relative" }}>
-            <Avatar name={userName} photo={userPhoto} size={22} />
-            <span className="sidebar-label truncate">{userName || "Profile"}</span>
+          <div style={{ position: "relative" }}>
+            <div onClick={() => setProfilePopoverOpen((o) => !o)} role="button" tabIndex={0} title={sidebarCollapsed ? (userName || "Profile") : undefined} className="sidebar-item">
+              <Avatar name={userName} photo={userPhoto} size={22} />
+              <span className="sidebar-label truncate">{userName || "Profile"}</span>
+            </div>
             {profilePopoverOpen && (
               <React.Fragment>
                 <div onClick={(e) => { e.stopPropagation(); setProfilePopoverOpen(false); }} style={{ position: "fixed", inset: 0, zIndex: 39, background: "transparent" }} />
@@ -8871,18 +8873,22 @@ function App() {
         </div>
       </div>
 
-      {userName && (
-        <div className="px-5 pt-2 text-xs" style={{ color: "var(--ink-soft)", fontFamily: "JetBrains Mono, monospace", position: "relative", zIndex: 24 }}>
-          {greeting}, {userName} 👋
-        </div>
-      )}
-
-      {motivationQuote && (
-        <div className="px-5 py-2 text-xs text-center" style={{
-          background: "var(--surface)", color: "var(--ink-soft)", borderBottom: "1px solid var(--border)",
-          fontFamily: "Lora, serif", fontStyle: "italic", position: "relative", zIndex: 24,
+      {(userName || motivationQuote) && (
+        <div className="mx-3 md:mx-5 mt-3 mb-1 px-4 py-2.5 rounded-2xl flex items-center justify-between gap-3 flex-wrap" style={{
+          background: "var(--surface)", border: "1px solid var(--border)",
+          backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+          position: "relative", zIndex: 24,
         }}>
-          “{motivationQuote}”
+          {userName ? (
+            <p className="text-xs" style={{ color: "var(--ink-soft)", fontFamily: "JetBrains Mono, monospace", whiteSpace: "nowrap" }}>
+              {greeting}, {userName} 👋
+            </p>
+          ) : <span />}
+          {motivationQuote && (
+            <p className="text-xs italic truncate" style={{ color: "var(--faint)", fontFamily: "Lora, serif", flex: 1, textAlign: "right", minWidth: 0 }}>
+              “{motivationQuote}”
+            </p>
+          )}
         </div>
       )}
 
