@@ -4087,6 +4087,137 @@ function aggregateHours(subjectsData, mode) {
    Mistake Notes (ported from the blueprint tracker as standalone
    modals, launched from Analytics)
 ----------------------------------------------------------------*/
+/* ---------------------------------------------------------------
+   ONBOARDING TOUR — spotlight walkthrough, shown once per tab per user.
+   Persisted via loadKey/saveKey (window.storage, personal scope) so it
+   never repeats after the user finishes or skips it, even on other devices
+   once synced. Call resetAllTours() (exposed on window) to replay everything.
+----------------------------------------------------------------*/
+function TourGuide({ tourId, steps, active, onDone }) {
+  const [stepIdx, setStepIdx] = useState(0);
+  const [rect, setRect] = useState(null);
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => { setStepIdx(0); }, [active, tourId]);
+
+  useEffect(() => {
+    if (!active) return;
+    const step = steps[stepIdx];
+    if (!step) return;
+    let cancelled = false;
+    const measure = () => {
+      if (cancelled) return;
+      const el = step.target ? document.querySelector(step.target) : null;
+      if (el) {
+        el.scrollIntoView({ block: "center", behavior: "smooth" });
+        setRect(el.getBoundingClientRect());
+      } else {
+        setRect(null);
+      }
+    };
+    measure();
+    const t1 = setTimeout(measure, 260);
+    const onResize = () => measure();
+    window.addEventListener("resize", onResize);
+    window.addEventListener("scroll", onResize, true);
+    return () => { cancelled = true; clearTimeout(t1); window.removeEventListener("resize", onResize); window.removeEventListener("scroll", onResize, true); };
+  }, [active, stepIdx, steps, tick]);
+
+  const finish = async (skipped) => {
+    await saveKey(`tour-done-${tourId}`, true);
+    onDone && onDone(skipped);
+  };
+  if (!active) return null;
+  const step = steps[stepIdx];
+  if (!step) return null;
+  const isLast = stepIdx === steps.length - 1;
+
+  const PAD = 8;
+  const hasRect = !!rect && rect.width > 0 && rect.height > 0;
+  const vw = window.innerWidth, vh = window.innerHeight;
+
+  let cardStyle = { position: "fixed", zIndex: 100001, maxWidth: 320, width: "calc(100vw - 32px)" };
+  if (hasRect) {
+    const spaceBelow = vh - rect.bottom, spaceAbove = rect.top;
+    const placeBelow = spaceBelow > 190 || spaceBelow >= spaceAbove;
+    const top = placeBelow ? Math.min(rect.bottom + 16, vh - 200) : undefined;
+    const bottom = !placeBelow ? Math.max(vh - rect.top + 16, 16) : undefined;
+    let left = Math.min(Math.max(rect.left, 16), vw - 336);
+    if (top !== undefined) cardStyle.top = top; else cardStyle.bottom = bottom;
+    cardStyle.left = left;
+  } else {
+    cardStyle.top = "50%"; cardStyle.left = "50%"; cardStyle.transform = "translate(-50%,-50%)";
+  }
+
+  return (
+    <div className="fixed inset-0" style={{ zIndex: 100000 }}>
+      {hasRect ? (
+        <div style={{
+          position: "fixed", top: rect.top - PAD, left: rect.left - PAD,
+          width: rect.width + PAD * 2, height: rect.height + PAD * 2,
+          borderRadius: 12, border: "2px solid var(--accent)",
+          boxShadow: "0 0 0 2000px rgba(4,4,4,0.72)",
+          pointerEvents: "none", transition: "top 0.25s ease, left 0.25s ease, width 0.25s ease, height 0.25s ease",
+        }} />
+      ) : (
+        <div className="fixed inset-0" style={{ background: "rgba(4,4,4,0.72)" }} onClick={() => setTick((v) => v + 1)} />
+      )}
+
+      <div style={cardStyle} className="rounded-xl p-4" onClick={(e) => e.stopPropagation()}>
+        <div className="rounded-xl p-4" style={{ background: "var(--panel)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", border: "1px solid var(--accent)" }}>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] font-semibold" style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--accent)", letterSpacing: 0.6 }}>
+              GUIDE · {stepIdx + 1}/{steps.length}
+            </span>
+            <button onClick={() => finish(true)} className="text-[10px]" style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--faint)" }}>skip tour ✕</button>
+          </div>
+          <p className="text-sm font-bold mb-1" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>{step.title}</p>
+          <p className="text-xs mb-4 leading-relaxed" style={{ color: "var(--ink-soft)" }}>{step.body}</p>
+          <div className="flex items-center justify-between gap-2">
+            <button
+              onClick={() => setStepIdx((i) => Math.max(0, i - 1))}
+              disabled={stepIdx === 0}
+              className="text-xs font-semibold px-2 py-1.5 rounded"
+              style={{ fontFamily: "JetBrains Mono, monospace", color: stepIdx === 0 ? "var(--faint)" : "var(--muted)", background: "var(--surface)", border: "1px solid var(--border)", opacity: stepIdx === 0 ? 0.5 : 1 }}>
+              ← back
+            </button>
+            <div className="flex gap-1">
+              {steps.map((_, i) => (
+                <span key={i} className="rounded-full" style={{ width: 5, height: 5, background: i === stepIdx ? "var(--accent)" : "var(--divider)" }} />
+              ))}
+            </div>
+            <button
+              onClick={() => (isLast ? finish(false) : setStepIdx((i) => i + 1))}
+              className="text-xs font-semibold px-3 py-1.5 rounded"
+              style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--on-ink)", background: "var(--accent)" }}>
+              {isLast ? "done ✓" : "next →"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* Hook: manages "has this tab's tour been seen before" + exposes a manual replay trigger. */
+function useTabTour(tourId) {
+  const [ready, setReady] = useState(false);
+  const [active, setActive] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const done = await loadKey(`tour-done-${tourId}`);
+      if (cancelled) return;
+      setActive(!done);
+      setReady(true);
+    })();
+    return () => { cancelled = true; };
+  }, [tourId]);
+  const replay = () => setActive(true);
+  const stop = () => setActive(false);
+  return { ready, active, replay, stop };
+}
+
 function ModalShell({ title, subtitle, onClose, children, wide }) {
   return (
     <div className="fixed inset-0 z-30 flex items-start justify-center overflow-y-auto p-4 sm:p-8"
@@ -6247,6 +6378,22 @@ function DateBox({ label, value, onChange, accent, placeholder }) {
   );
 }
 
+const OVERVIEW_TOUR_STEPS = [
+  { target: null, title: "স্বাগতম Overview ট্যাবে 👋", body: "এইটা তোমার হোম স্ক্রিন — এখান থেকেই তুমি প্রতিদিনের অগ্রগতি, আজকের কাজ, আর গোটা প্রস্তুতির স্ন্যাপশট এক নজরে দেখতে পাবে। কয়েকটা ধাপে ঘুরিয়ে দেখাই, কী কী আছে।" },
+  { target: "[data-tour='ov-track']", title: "ট্র্যাক বাছাই", body: "এখানে ট্যাপ করে Engineering, Medical, Varsity বা IBA ট্র্যাক বদলাতে পারবে। যে ট্র্যাক সিলেক্ট থাকবে, নিচের পুরো Overview (progress, subjects, তারিখ — সবকিছু) সেই ট্র্যাক অনুযায়ী দেখাবে।" },
+  { target: "[data-tour='ov-date']", title: "অ্যাডমিশন টেস্টের তারিখ", body: "নিজের অনুমান করা (predicted) তারিখ বসাও — এটা দিয়েই pace/required hours হিসাব হয়। অফিসিয়াল তারিখ ঘোষণা হলে 'add official date' চেপে বসিয়ে দিও, তখন সেটাই মূল টার্গেট হয়ে যাবে।" },
+  { target: "[data-tour='ov-next-exam']", title: "পরবর্তী পরীক্ষা", body: "সবচেয়ে কাছের পরীক্ষার নাম, তারিখ আর বাকি দিন এখানে দেখাবে। ট্যাপ করলে সরাসরি Exam Tracker ট্যাবে চলে যাবে। (নতুন পরীক্ষা যোগ না করলে এই কার্ডটা দেখাবে না।)" },
+  { target: "[data-tour='ov-stats']", title: "সংক্ষিপ্ত পরিসংখ্যান", body: "Syllabus progress, স্টাডি streak, আজ/এই সপ্তাহে কত ঘণ্টা পড়েছ, actual vs required pace, exam average, আর current pace-এ কবে শেষ হবে (projected completion) — সব একনজরে।" },
+  { target: "[data-tour='ov-agenda']", title: "আজকের এজেন্ডা", body: "আজকের জন্য প্ল্যান করা চ্যাপ্টার, daily focus item, routine আর exam-prep টাস্ক সব একসাথে এখানে জমা হয়। চেকবক্স টিক দিলেই সেটা 'done' হিসেবে গণনা হয়ে যাবে — অন্য কোথাও গিয়ে টিক দেয়া লাগবে না।" },
+  { target: "[data-tour='ov-week-plan']", title: "এই সপ্তাহের প্ল্যান", body: "Routine ট্যাব থেকে যে সাপ্তাহিক প্ল্যান বানাবে, তার প্রথম কয়েকটা আইটেম এখানে দেখা যাবে। পুরোটা দেখতে বা নতুন প্ল্যান বানাতে নিচের লিংকে চাপো।" },
+  { target: "[data-tour='ov-subject-progress']", title: "সাবজেক্ট-ওয়াইজ প্রোগ্রেস", body: "প্রতিটা সাবজেক্টের সিলেবাস কত শতাংশ শেষ হয়েছে, তার bar এখানে। কোন সাবজেক্ট পিছিয়ে আছে সেটা এক নজরেই বোঝা যাবে।" },
+  { target: "[data-tour='ov-mood-week']", title: "গত ৭ দিনের মুড", body: "Calendar ট্যাবে প্রতিদিনের শেষে যে মুড (ভালো/খারাপ/মোটামুটি) সেট করো, তার শেষ ৭ দিনের প্যাটার্ন এখানে রঙিন আইকনে দেখা যায়।" },
+  { target: "[data-tour='ov-attention']", title: "Needs attention", body: "কোন চ্যাপ্টারগুলো বেশি গুরুত্বপূর্ণ (weight) অথচ অনেকদিন ছোঁয়া হয়নি (neglect) — এই দুইটা মিলিয়ে স্কোর করে সবচেয়ে জরুরি চ্যাপ্টারগুলো এখানে র‍্যাঙ্ক করে দেখানো হয়।" },
+  { target: "[data-tour='ov-revision']", title: "Revision due", body: "যেসব চ্যাপ্টার একবার মাস্টার করেছিলে কিন্তু রিভিশনের সময় পার হয়ে গেছে, সেগুলো এখানে লিস্ট হয় — যাতে ভুলে না যাও।" },
+  { target: "[data-tour='ov-recent-exams']", title: "সাম্প্রতিক পরীক্ষা", body: "শেষ কয়েকটা পরীক্ষার ফলাফল (%) এখানে ছোট আকারে দেখা যাবে। বিস্তারিত অ্যানালিটিক্সের জন্য Exam Tracker বা Analytics ট্যাবে যাও।" },
+  { target: null, title: "এই গাইড আবার দেখতে চাইলে", body: "উপরে ট্র্যাক সিলেক্টরের পাশেই 'guide' বাটন আছে — যেকোনো সময় চাপলেই এই ট্যুরটা আবার শুরু হয়ে যাবে। বাকি ট্যাবগুলোতে (Study, Calendar, Routine, Exam Tracker, Analytics, Community) গেলেও প্রথমবার নিজে থেকেই একটা গাইড শুরু হবে।" },
+];
+
 function OverviewTab({ subjectsData, calendarData, setDayData, mixedExams, routines, routineChecks, setRoutineChecks, examRoutines, examRoutineChecks, setExamRoutineChecks, predictedDates, setPredictedDate, officialDates, setOfficialDate, track, setTrack, goTo, weeklyPlans, weekStartDay, dailyChecks, setDailyChecks }) {
   const visibleSubjects = SUBJECTS.filter((s) => TRACKS.find((t) => t.id === track).subjects.includes(s.id));
   const predictedDate = predictedDates[track] || "";
@@ -6420,12 +6567,14 @@ function OverviewTab({ subjectsData, calendarData, setDayData, mixedExams, routi
     </div>
   );
 
+  const tour = useTabTour("overview");
+
   return (
     <div>
       {!scrollDismissed && todaysDuePlans.length > 0 && (
         <div className="fixed inset-0 z-40 flex items-center justify-center p-4" style={{ background: "var(--overlay)" }}
           onClick={(e) => { if (e.target === e.currentTarget) dismissScroll(); }}>
-          <div className="w-full text-center rounded-xl p-6" style={{ maxWidth: 360, background: "var(--panel)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", border: "1px solid #96741F" }}>
+          <div className="w-full text-center rounded-xl p-6" style={{ maxWidth: 360, background: "var(--panel)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", border: "1px solid var(--accent)" }}>
             <p className="text-xs uppercase tracking-wide mb-3" style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--faint)", letterSpacing: 0.6 }}>the scroll for today</p>
             <p className="text-base mb-4 leading-relaxed" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>{dailyQuote(todayStr)}</p>
             <p className="text-base font-semibold mb-0.5" style={{ fontFamily: "Lora, serif", color: "var(--accent)" }}>
@@ -6435,25 +6584,32 @@ function OverviewTab({ subjectsData, calendarData, setDayData, mixedExams, routi
             <div className="flex gap-2">
               <button onClick={dismissScroll} className="flex-1 text-xs py-2 rounded-lg" style={{ fontFamily: "JetBrains Mono, monospace", background: "var(--surface)", color: "var(--muted)", border: "1px solid var(--border)" }}>not today</button>
               <button onClick={() => { dismissScroll(); goTo && goTo("chapters", { subjectId: todaysDuePlans[0].subjectId, chapterId: todaysDuePlans[0].chapterId }); }}
-                className="flex-1 text-xs font-semibold py-2 rounded-lg" style={{ fontFamily: "JetBrains Mono, monospace", background: "#96741F", color: "var(--on-ink)" }}>begin</button>
+                className="flex-1 text-xs font-semibold py-2 rounded-lg" style={{ fontFamily: "JetBrains Mono, monospace", background: "var(--accent)", color: "var(--on-ink)" }}>begin</button>
             </div>
           </div>
         </div>
       )}
 
-      <div className="flex gap-1 flex-wrap mb-4">
-        {TRACKS.map((t) => (
-          <button key={t.id} onClick={() => setTrack(t.id)}
-            className="px-3 py-1 rounded text-xs font-semibold"
-            style={{
-              fontFamily: "JetBrains Mono, monospace",
-              background: track === t.id ? "var(--ink-strong)" : "var(--surface)",
-              color: track === t.id ? "var(--on-ink)" : "var(--muted)",
-              border: `1px solid ${track === t.id ? "var(--ink-strong)" : "var(--border)"}`,
-            }}>
-            {t.label}
-          </button>
-        ))}
+      <div className="flex items-center justify-between mb-4 gap-2">
+        <div className="flex gap-1 flex-wrap" data-tour="ov-track">
+          {TRACKS.map((t) => (
+            <button key={t.id} onClick={() => setTrack(t.id)}
+              className="px-3 py-1 rounded text-xs font-semibold"
+              style={{
+                fontFamily: "JetBrains Mono, monospace",
+                background: track === t.id ? "var(--ink-strong)" : "var(--surface)",
+                color: track === t.id ? "var(--on-ink)" : "var(--muted)",
+                border: `1px solid ${track === t.id ? "var(--ink-strong)" : "var(--border)"}`,
+              }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <button onClick={tour.replay} className="text-xs font-semibold px-2 py-1 rounded flex-shrink-0 flex items-center gap-1"
+          style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--accent)", border: "1px solid var(--border)", background: "var(--surface)" }}
+          title="Replay the Overview guide">
+          <HelpCircle size={12} /> guide
+        </button>
       </div>
 
       {(
@@ -6461,7 +6617,7 @@ function OverviewTab({ subjectsData, calendarData, setDayData, mixedExams, routi
           <p className="text-sm font-semibold mb-2" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>
             {TRACK_SHORT_LABEL[track] || track} admission test date
           </p>
-          <div className="flex gap-3 flex-wrap mb-2">
+          <div className="flex gap-3 flex-wrap mb-2" data-tour="ov-date">
             {officialDate ? (
               <DateBox label="Official date" value={officialDate} onChange={(v) => setOfficialDate(track, v)} accent="#8C3B2E" placeholder="add once announced" />
             ) : addingOfficial ? (
@@ -6490,6 +6646,7 @@ function OverviewTab({ subjectsData, calendarData, setDayData, mixedExams, routi
       )}
       {!examsToday.length && nextExam && (
         <button onClick={() => goTo && goTo("exams")} className="w-full p-3 rounded-lg mb-3 flex items-center justify-between gap-2 text-left"
+          data-tour="ov-next-exam"
           style={{ background: "var(--panel)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", border: "1px solid var(--divider)" }}>
           <span className="flex items-center gap-2 min-w-0">
             <GraduationCap size={16} color="#8C3B2E" className="flex-shrink-0" />
@@ -6503,7 +6660,7 @@ function OverviewTab({ subjectsData, calendarData, setDayData, mixedExams, routi
         </button>
       )}
 
-      <div className="flex gap-3 flex-wrap mb-6">
+      <div className="flex gap-3 flex-wrap mb-6" data-tour="ov-stats">
         <StatCard label="Syllabus progress" value={`${Math.round(overallProgress)}%`} sub={`${doneChapters}/${totalChapters} chapters done`} />
         <StatCard label="Study streak" value={`${streak}d`} sub="consecutive days studied" />
         <StatCard label="Today" value={`${todayHours}h`} sub="hours logged so far" />
@@ -6515,7 +6672,7 @@ function OverviewTab({ subjectsData, calendarData, setDayData, mixedExams, routi
         <StatCard label="Projected completion" value={projLabel} sub={projSub} valueColor={projColor} />
       </div>
 
-      <div className="mb-6">
+      <div className="mb-6" data-tour="ov-agenda">
         <p className="text-sm font-semibold mb-2 flex items-center justify-between" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>
           <span>Today's agenda</span>
           {todayAgenda.length > 0 && <span className="text-xs font-normal" style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--faint)" }}>{todayAgendaDone}/{todayAgenda.length} done</span>}
@@ -6536,7 +6693,7 @@ function OverviewTab({ subjectsData, calendarData, setDayData, mixedExams, routi
         </div>
       </div>
 
-      <div className="mb-6">
+      <div className="mb-6" data-tour="ov-week-plan">
         <p className="text-sm font-semibold mb-2 flex items-center justify-between" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>
           <span>This week's plan</span>
           {weekPlanItems.length > 0 && <span className="text-xs font-normal" style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--faint)" }}>{weekPlanDone}/{weekPlanItems.length} done</span>}
@@ -6564,7 +6721,7 @@ function OverviewTab({ subjectsData, calendarData, setDayData, mixedExams, routi
       <div className="grid md:grid-cols-2 gap-6">
         <div>
           <p className="text-sm font-semibold mb-2" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>Subject progress</p>
-          <div className="space-y-2">
+          <div className="space-y-2" data-tour="ov-subject-progress">
             {visibleSubjects.map((s) => {
               const p = subjectProgress(s, subjectsData[s.id]);
               return (
@@ -6582,7 +6739,7 @@ function OverviewTab({ subjectsData, calendarData, setDayData, mixedExams, routi
           </div>
 
           <p className="text-sm font-semibold mt-6 mb-2" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>Last 7 days</p>
-          <div className="flex gap-2">
+          <div className="flex gap-2" data-tour="ov-mood-week">
             {last7.map((d) => {
               const Icon = d.mood?.icon;
               return (
@@ -6602,7 +6759,7 @@ function OverviewTab({ subjectsData, calendarData, setDayData, mixedExams, routi
           <p className="text-sm font-semibold mb-2" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>
             Needs attention (weight × neglect)
           </p>
-          <div className="space-y-1 mb-6">
+          <div className="space-y-1 mb-6" data-tour="ov-attention">
             {topAttention.map((r, i) => (
               <div key={i} className="flex items-center gap-2 text-xs p-2 rounded" style={{ background: "var(--panel)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", border: "1px solid var(--divider)" }}>
                 <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: r.accent }} />
@@ -6616,7 +6773,7 @@ function OverviewTab({ subjectsData, calendarData, setDayData, mixedExams, routi
           <p className="text-sm font-semibold mb-2 flex items-center gap-1.5" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>
             <RotateCcw size={13} /> Revision due
           </p>
-          <div className="space-y-1 mb-6">
+          <div className="space-y-1 mb-6" data-tour="ov-revision">
             {dueForRevision.slice(0, 5).map((r, i) => (
               <div key={i} className="flex items-center gap-2 text-xs p-2 rounded" style={{ background: "var(--panel)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", border: "1px solid var(--divider)" }}>
                 <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: r.accent }} />
@@ -6629,7 +6786,7 @@ function OverviewTab({ subjectsData, calendarData, setDayData, mixedExams, routi
           </div>
 
           <p className="text-sm font-semibold mb-2" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>Recent exams</p>
-          <div className="space-y-1">
+          <div className="space-y-1" data-tour="ov-recent-exams">
             {recentExams.map((e) => {
               const t = examStats(e);
               return (
@@ -6643,6 +6800,8 @@ function OverviewTab({ subjectsData, calendarData, setDayData, mixedExams, routi
           </div>
         </div>
       </div>
+
+      <TourGuide tourId="overview" steps={OVERVIEW_TOUR_STEPS} active={tour.active} onDone={tour.stop} />
     </div>
   );
 }
@@ -9066,13 +9225,13 @@ function App() {
       {!nameModalOpen && !todayScheduleOpen && !dayAdviceDismissed && (
         <div className="fixed inset-0 z-40 flex items-center justify-center p-4" style={{ background: "var(--overlay)" }}
           onClick={(e) => { if (e.target === e.currentTarget) dismissDayAdvice(); }}>
-          <div className="w-full text-center rounded-xl p-6" style={{ maxWidth: 360, background: "var(--panel)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", border: `1px solid ${dayAdviceMet ? "#1F6F5C" : "#96741F"}` }}>
+          <div className="w-full text-center rounded-xl p-6" style={{ maxWidth: 360, background: "var(--panel)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", border: "1px solid var(--accent)" }}>
             <p className="text-xs uppercase tracking-wide mb-2" style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--faint)", letterSpacing: 0.6 }}>
               yesterday: {yesterdayHours}h {dayAdviceMet ? "— strong day" : `· under ${dailyHourThreshold}h`}
             </p>
             <p className="text-base mb-5 leading-relaxed" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>{dayAdviceText}</p>
             <button onClick={dismissDayAdvice} className="w-full text-xs font-semibold py-2 rounded-lg"
-              style={{ fontFamily: "JetBrains Mono, monospace", background: dayAdviceMet ? "#1F6F5C" : "#96741F", color: "var(--on-ink)" }}>got it</button>
+              style={{ fontFamily: "JetBrains Mono, monospace", background: "var(--accent)", color: "var(--on-ink)" }}>got it</button>
           </div>
         </div>
       )}
