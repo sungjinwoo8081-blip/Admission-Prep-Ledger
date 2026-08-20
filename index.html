@@ -343,7 +343,7 @@
 
       async fetchDirectory() {
         if (!sb) return [];
-        const { data, error } = await sb.from("leaderboard").select("user_id,name,photo");
+        const { data, error } = await sb.from("leaderboard").select("user_id,name,photo,track");
         if (error || !data) return [];
         return data;
       },
@@ -389,7 +389,7 @@
         return data.reverse();
       },
 
-      async sendMessage({ groupId, recipientId, message, name, photo }) {
+      async sendMessage({ groupId, recipientId, message, name, photo, imageUrl }) {
         if (!sb || !currentUserId) return null;
         const row = {
           sender_id: currentUserId,
@@ -397,11 +397,82 @@
           sender_photo: photo || null,
           group_id: groupId || null,
           recipient_id: recipientId || null,
-          message,
+          message: message || "",
         };
+        // Only attach image_url if provided, so this keeps working even before the
+        // "chat-images" migration (see supabase-chat-social.sql) has been run.
+        if (imageUrl) row.image_url = imageUrl;
         const { data, error } = await sb.from("chat_messages").insert(row).select().single();
         if (error) throw error;
         return data;
+      },
+
+      // Uploads an image the user picked in chat to the "chat-images" storage bucket
+      // and returns its public URL. Requires the chat-images bucket + policies from
+      // supabase-chat-social.sql to already be set up.
+      async uploadChatImage(file) {
+        if (!sb || !currentUserId) throw new Error("Not signed in");
+        const ext = (file.name && file.name.includes(".")) ? file.name.split(".").pop() : "jpg";
+        const path = `${currentUserId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+        const { error } = await sb.storage.from("chat-images").upload(path, file, { upsert: false, contentType: file.type || undefined });
+        if (error) throw error;
+        const { data } = sb.storage.from("chat-images").getPublicUrl(path);
+        return data.publicUrl;
+      },
+
+      // Presence — lets the UI show a green "online" dot next to friends/directory entries.
+      // No DB table needed; uses Supabase Realtime Presence. onChange receives an array
+      // of currently-online user ids.
+      startPresence(userId, name, onChange) {
+        if (!sb || !userId) return () => {};
+        const channel = sb.channel("presence-online", { config: { presence: { key: userId } } });
+        const emit = () => {
+          try {
+            const state = channel.presenceState();
+            onChange(Object.keys(state));
+          } catch (e) {}
+        };
+        channel.on("presence", { event: "sync" }, emit);
+        channel.subscribe(async (status) => {
+          if (status === "SUBSCRIBED") {
+            try { await channel.track({ name: name || "Anonymous", online_at: new Date().toISOString() }); } catch (e) {}
+            emit();
+          }
+        });
+        return () => { try { sb.removeChannel(channel); } catch (e) {} };
+      },
+
+      // Message reactions (👍 🔥 ❤️ etc). Requires the chat_message_reactions table
+      // from supabase-chat-social.sql.
+      async fetchReactions(messageIds) {
+        if (!sb || !messageIds || !messageIds.length) return {};
+        const { data, error } = await sb.from("chat_message_reactions").select("*").in("message_id", messageIds);
+        if (error || !data) return {};
+        const map = {};
+        data.forEach((r) => {
+          if (!map[r.message_id]) map[r.message_id] = [];
+          map[r.message_id].push(r);
+        });
+        return map;
+      },
+
+      async toggleReaction(messageId, emoji) {
+        if (!sb || !currentUserId) return;
+        const { data: existing } = await sb.from("chat_message_reactions").select("id")
+          .eq("message_id", messageId).eq("user_id", currentUserId).eq("emoji", emoji).maybeSingle();
+        if (existing) {
+          await sb.from("chat_message_reactions").delete().eq("id", existing.id);
+        } else {
+          try { await sb.from("chat_message_reactions").insert({ message_id: messageId, user_id: currentUserId, emoji }); } catch (e) {}
+        }
+      },
+
+      subscribeToReactions(onChange) {
+        if (!sb) return () => {};
+        const channel = sb.channel("chat_reactions_all")
+          .on("postgres_changes", { event: "*", schema: "public", table: "chat_message_reactions" }, (payload) => onChange(payload))
+          .subscribe();
+        return () => { try { sb.removeChannel(channel); } catch (e) {} };
       },
 
       subscribeToMessages(onInsert) {
@@ -7655,7 +7726,7 @@ const THEMES = [
 ];
 const THEME_IDS = THEMES.map((t) => t.id);
 
-function CommunityTab({ dark, userName, userPhoto }) {
+function CommunityTab({ dark, userName, userPhoto, track }) {
   const [rows, setRows] = useState(null);
   const [error, setError] = useState("");
 
@@ -7727,7 +7798,7 @@ function CommunityTab({ dark, userName, userPhoto }) {
 
       <div className="mt-8">
         <h2 className="text-lg font-bold mb-3" style={{ color: dark ? "#fff" : "#241A12" }}>চ্যাট</h2>
-        <ChatHub dark={dark} userName={userName} userPhoto={userPhoto} />
+        <ChatHub dark={dark} userName={userName} userPhoto={userPhoto} myTrack={track} />
       </div>
     </div>
   );
@@ -7738,7 +7809,7 @@ const COMMUNITY_GROUP_ID = "00000000-0000-0000-0000-000000000001";
 function convKeyForGroup(groupId) { return "g:" + groupId; }
 function convKeyForDM(myId, otherId) { return "dm:" + [myId, otherId].sort().join(":"); }
 
-function ChatHub({ dark, userName, userPhoto }) {
+function ChatHub({ dark, userName, userPhoto, myTrack }) {
   const cs = window.cloudSync;
   const myId = cs.getUserId();
   const [directory, setDirectory] = useState([]);
@@ -7752,6 +7823,14 @@ function ChatHub({ dark, userName, userPhoto }) {
   const [showRequests, setShowRequests] = useState(false);
   const [mobileThreadOpen, setMobileThreadOpen] = useState(false);
   const [active, setActive] = useState({ type: "group", groupId: COMMUNITY_GROUP_ID, name: "Community" });
+  const [onlineIds, setOnlineIds] = useState([]);
+
+  // Presence — a small green dot next to whoever is online right now.
+  useEffect(() => {
+    if (!myId) return;
+    const stop = cs.startPresence(myId, userName, setOnlineIds);
+    return stop;
+  }, [myId, userName]);
 
   const loadSidebar = useCallback(async () => {
     const [dir, gs, fm, inc, rs] = await Promise.all([
@@ -7821,29 +7900,52 @@ function ChatHub({ dark, userName, userPhoto }) {
     if (!search.trim()) return true;
     return (d.name || "").toLowerCase().includes(search.trim().toLowerCase());
   });
+  const suggestedFriends = myTrack
+    ? directory.filter((d) => d.user_id && d.user_id !== myId && d.track === myTrack && !friendMap[d.user_id]).slice(0, 5)
+    : [];
+
+  // Shared glass-glow style for the active conversation in the sidebar list.
+  function navItemStyle(isActive) {
+    return {
+      background: isActive
+        ? "linear-gradient(135deg, color-mix(in srgb, var(--accent) 26%, transparent), color-mix(in srgb, var(--accent) 8%, transparent))"
+        : "transparent",
+      color: isActive ? "var(--ink)" : (dark ? "#ddd" : "#333"),
+      border: `1px solid ${isActive ? "color-mix(in srgb, var(--accent) 45%, transparent)" : "transparent"}`,
+      boxShadow: isActive ? "0 0 14px color-mix(in srgb, var(--accent) 35%, transparent)" : "none",
+      backdropFilter: isActive ? "blur(6px)" : "none",
+      WebkitBackdropFilter: isActive ? "blur(6px)" : "none",
+      transition: "background 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease",
+    };
+  }
+
+  function OnlineDot({ uid }) {
+    if (!uid || !onlineIds.includes(uid)) return null;
+    return <span className="flex-shrink-0" style={{ width: 7, height: 7, borderRadius: "50%", background: "#2FA876", boxShadow: "0 0 5px rgba(47,168,118,0.8)" }} />;
+  }
 
   return (
     <div className="flex flex-col sm:flex-row gap-4">
       <div className={`${mobileThreadOpen ? "hidden" : "block"} sm:block w-full sm:w-60 flex-shrink-0 space-y-1`}>
         <button onClick={() => openConversation({ type: "group", groupId: COMMUNITY_GROUP_ID, name: "Community" })}
-          className="w-full text-left text-sm px-3 py-2 rounded truncate flex items-center justify-between"
-          style={{ background: active.groupId === COMMUNITY_GROUP_ID ? "var(--accent)" : "transparent", color: active.groupId === COMMUNITY_GROUP_ID ? "#fff" : (dark ? "#ddd" : "#333") }}>
+          className="w-full text-left text-sm px-3 py-2 rounded-lg truncate flex items-center justify-between"
+          style={navItemStyle(active.groupId === COMMUNITY_GROUP_ID)}>
           <span># Community</span>
-          {isUnread(convKeyForGroup(COMMUNITY_GROUP_ID)) && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: active.groupId === COMMUNITY_GROUP_ID ? "#fff" : "var(--accent)" }} />}
+          {isUnread(convKeyForGroup(COMMUNITY_GROUP_ID)) && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: "var(--accent)" }} />}
         </button>
         {groups.filter((g) => !g.is_public).map((g) => (
           <button key={g.id} onClick={() => openConversation({ type: "group", groupId: g.id, name: g.name })}
-            className="w-full text-left text-sm px-3 py-2 rounded truncate flex items-center justify-between"
-            style={{ background: active.groupId === g.id ? "var(--accent)" : "transparent", color: active.groupId === g.id ? "#fff" : (dark ? "#ddd" : "#333") }}>
+            className="w-full text-left text-sm px-3 py-2 rounded-lg truncate flex items-center justify-between"
+            style={navItemStyle(active.groupId === g.id)}>
             <span className="truncate"># {g.name}</span>
-            {isUnread(convKeyForGroup(g.id)) && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: active.groupId === g.id ? "#fff" : "var(--accent)" }} />}
+            {isUnread(convKeyForGroup(g.id)) && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: "var(--accent)" }} />}
           </button>
         ))}
-        <button onClick={() => setShowNewGroup(true)} className="w-full text-left text-xs px-3 py-2 rounded" style={{ color: "var(--accent)" }}>
+        <button onClick={() => setShowNewGroup(true)} className="w-full text-left text-xs px-3 py-2 rounded-lg" style={{ color: "var(--accent)" }}>
           + নতুন গ্রুপ
         </button>
 
-        <button onClick={() => setShowRequests(true)} className="w-full text-left text-xs px-3 py-2 rounded flex items-center justify-between" style={{ color: dark ? "#ddd" : "#333" }}>
+        <button onClick={() => setShowRequests(true)} className="w-full text-left text-xs px-3 py-2 rounded-lg flex items-center justify-between" style={{ color: dark ? "#ddd" : "#333" }}>
           <span>বন্ধুর অনুরোধ</span>
           {incomingRequests.length > 0 && (
             <span className="text-[10px] px-1.5 rounded-full" style={{ background: "var(--accent)", color: "#fff" }}>{incomingRequests.length}</span>
@@ -7858,13 +7960,33 @@ function ChatHub({ dark, userName, userPhoto }) {
               const key = convKeyForDM(myId, uid);
               return (
                 <button key={uid} onClick={() => openConversation({ type: "dm", recipientId: uid, name: p?.name || "Anonymous" })}
-                  className="w-full text-left text-xs px-3 py-1.5 rounded truncate flex items-center justify-between"
-                  style={{ background: active.recipientId === uid ? "var(--accent)" : "transparent", color: active.recipientId === uid ? "#fff" : (dark ? "#ddd" : "#666") }}>
-                  <span className="truncate">{p?.name || "Anonymous"}</span>
-                  {isUnread(key) && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: active.recipientId === uid ? "#fff" : "var(--accent)" }} />}
+                  className="w-full text-left text-xs px-3 py-1.5 rounded-lg truncate flex items-center gap-1.5 justify-between"
+                  style={navItemStyle(active.recipientId === uid)}>
+                  <span className="flex items-center gap-1.5 min-w-0 flex-1">
+                    <OnlineDot uid={uid} />
+                    <span className="truncate">{p?.name || "Anonymous"}</span>
+                  </span>
+                  {isUnread(key) && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: "var(--accent)" }} />}
                 </button>
               );
             })}
+          </div>
+        )}
+
+        {suggestedFriends.length > 0 && (
+          <div className="pt-2 mt-2" style={{ borderTop: "1px solid var(--border)" }}>
+            <p className="text-xs px-3 mb-1" style={{ color: dark ? "#888" : "#999" }}>একই ট্র্যাকের মানুষ</p>
+            {suggestedFriends.map((d) => (
+              <div key={d.user_id}
+                className="w-full text-left text-xs px-3 py-1.5 rounded-lg truncate flex items-center gap-1.5"
+                style={{ color: dark ? "#aaa" : "#666" }}>
+                <span className="flex items-center gap-1.5 min-w-0 flex-1 cursor-pointer" onClick={() => openConversation({ type: "dm", recipientId: d.user_id, name: d.name || "Anonymous" })}>
+                  <OnlineDot uid={d.user_id} />
+                  <span className="truncate">{d.name || "Anonymous"}</span>
+                </span>
+                {friendButton(d.user_id)}
+              </div>
+            ))}
           </div>
         )}
 
@@ -7872,7 +7994,7 @@ function ChatHub({ dark, userName, userPhoto }) {
           <input
             value={search} onChange={(e) => setSearch(e.target.value)}
             placeholder="মানুষ খুঁজুন…"
-            className="w-full text-xs px-3 py-1.5 rounded mb-1"
+            className="w-full text-xs px-3 py-1.5 rounded-lg mb-1"
             style={{ border: "1px solid var(--border)", background: dark ? "#14161A" : "#fafafa", color: dark ? "#fff" : "#241A12" }}
           />
           <div className="max-h-40 overflow-y-auto">
@@ -7884,10 +8006,11 @@ function ChatHub({ dark, userName, userPhoto }) {
                 return (
                   <div key={d.user_id}
                     onClick={() => openConversation({ type: "dm", recipientId: d.user_id, name: d.name || "Anonymous" })}
-                    className="w-full text-left text-xs px-3 py-1.5 rounded truncate flex items-center gap-2 cursor-pointer"
-                    style={{ background: active.recipientId === d.user_id ? "var(--accent)" : "transparent", color: active.recipientId === d.user_id ? "#fff" : (dark ? "#aaa" : "#666") }}>
+                    className="w-full text-left text-xs px-3 py-1.5 rounded-lg truncate flex items-center gap-2 cursor-pointer"
+                    style={navItemStyle(active.recipientId === d.user_id)}>
+                    <OnlineDot uid={d.user_id} />
                     <span className="flex-1 truncate">{d.name || "Anonymous"}</span>
-                    {isUnread(key) && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: active.recipientId === d.user_id ? "#fff" : "var(--accent)" }} />}
+                    {isUnread(key) && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "var(--accent)" }} />}
                     {friendButton(d.user_id)}
                   </div>
                 );
@@ -7901,7 +8024,7 @@ function ChatHub({ dark, userName, userPhoto }) {
         <ChatThread
           key={active.type + (active.groupId || active.recipientId)}
           dark={dark} userName={userName} userPhoto={userPhoto} active={active}
-          directory={directory}
+          directory={directory} myId={myId}
           onBack={() => setMobileThreadOpen(false)}
           onLeftGroup={() => { loadSidebar(); openConversation({ type: "group", groupId: COMMUNITY_GROUP_ID, name: "Community" }); }}
         />
@@ -7949,16 +8072,22 @@ function ChatHub({ dark, userName, userPhoto }) {
   );
 }
 
-function ChatThread({ dark, userName, userPhoto, active, directory, onBack, onLeftGroup }) {
+const REACTION_EMOJIS = ["👍", "🔥", "❤️"];
+
+function ChatThread({ dark, userName, userPhoto, active, directory, myId: myIdProp, onBack, onLeftGroup }) {
   const cs = window.cloudSync;
   const [messages, setMessages] = useState(null);
+  const [reactions, setReactions] = useState({});
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
   const [memberIds, setMemberIds] = useState([]);
   const listRef = useRef(null);
-  const myId = cs.getUserId();
+  const messagesRef = useRef([]);
+  const fileInputRef = useRef(null);
+  const myId = myIdProp || cs.getUserId();
 
   useEffect(() => {
     let cancelled = false;
@@ -7980,6 +8109,36 @@ function ChatThread({ dark, userName, userPhoto, active, directory, onBack, onLe
   useEffect(() => {
     if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [messages]);
+
+  // Keep a ref in sync so the realtime reaction subscription (set up once) can always
+  // see which messages are currently on screen without re-subscribing on every message.
+  useEffect(() => { messagesRef.current = messages || []; }, [messages]);
+
+  async function refreshReactions() {
+    const ids = messagesRef.current.map((m) => m.id);
+    if (!ids.length) return;
+    const map = await cs.fetchReactions(ids);
+    setReactions(map);
+  }
+
+  useEffect(() => { refreshReactions(); }, [messages]);
+
+  useEffect(() => {
+    const unsub = cs.subscribeToReactions(() => { refreshReactions(); });
+    return unsub;
+  }, []);
+
+  async function toggleReaction(messageId, emoji) {
+    await cs.toggleReaction(messageId, emoji);
+    refreshReactions();
+  }
+
+  function reactionsFor(messageId) {
+    const list = reactions[messageId] || [];
+    const byEmoji = {};
+    list.forEach((r) => { (byEmoji[r.emoji] = byEmoji[r.emoji] || []).push(r.user_id); });
+    return byEmoji;
+  }
 
   async function submit(e) {
     e.preventDefault();
@@ -8003,6 +8162,30 @@ function ChatThread({ dark, userName, userPhoto, active, directory, onBack, onLe
     }
   }
 
+  async function handlePickImage(e) {
+    const file = e.target.files && e.target.files[0];
+    if (e.target) e.target.value = "";
+    if (!file) return;
+    setImageUploading(true);
+    setError("");
+    try {
+      const url = await cs.uploadChatImage(file);
+      await cs.sendMessage({
+        groupId: active.type === "group" ? active.groupId : null,
+        recipientId: active.type === "dm" ? active.recipientId : null,
+        message: draft.trim(),
+        name: userName,
+        photo: userPhoto,
+        imageUrl: url,
+      });
+      setDraft("");
+    } catch (err) {
+      setError("ছবি পাঠানো যায়নি — chat-images স্টোরেজ বাকেট সেটআপ করা আছে কিনা চেক করুন।");
+    } finally {
+      setImageUploading(false);
+    }
+  }
+
   async function openMembers() {
     const ids = await cs.fetchGroupMembers(active.groupId);
     setMemberIds(ids);
@@ -8018,64 +8201,116 @@ function ChatThread({ dark, userName, userPhoto, active, directory, onBack, onLe
   const isCustomGroup = active.type === "group" && active.groupId !== COMMUNITY_GROUP_ID;
 
   return (
-    <div className="rounded-lg overflow-hidden flex flex-col" style={{ border: "1px solid var(--border)", height: 420 }}>
-      <div className="px-3 py-2 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border)", background: dark ? "#1c1f26" : "#fff" }}>
+    <div className="rounded-xl overflow-hidden flex flex-col" style={{ border: "1px solid var(--border)", height: 460, boxShadow: "0 10px 30px rgba(0,0,0,0.12)" }}>
+      <div className="px-3 py-2 flex items-center justify-between" style={{
+        borderBottom: "1px solid var(--border)", background: "linear-gradient(180deg, var(--panel), var(--surface))",
+        backdropFilter: "blur(18px) saturate(140%)", WebkitBackdropFilter: "blur(18px) saturate(140%)",
+      }}>
         <div className="flex items-center gap-2 min-w-0">
           {onBack && (
-            <button onClick={onBack} className="sm:hidden text-sm flex-shrink-0" style={{ color: dark ? "#ddd" : "#333" }}>←</button>
+            <button onClick={onBack} className="sm:hidden text-sm flex-shrink-0" style={{ color: "var(--ink)" }}>←</button>
           )}
-          <span className="text-sm font-semibold truncate" style={{ color: dark ? "#fff" : "#241A12" }}>
+          <span className="text-sm font-semibold truncate" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>
             {active.type === "group" ? "# " : ""}{active.name}
           </span>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0 ml-2">
           {isCustomGroup && (
-            <button onClick={openMembers} className="text-[10px] px-1.5 py-0.5 rounded" style={{ border: "1px solid var(--border)", color: dark ? "#aaa" : "#666" }}>
+            <button onClick={openMembers} className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ border: "1px solid var(--border)", color: "var(--muted)" }}>
               👥 মেম্বার
             </button>
           )}
-          <span className="text-[10px]" style={{ color: dark ? "#6b7280" : "#aaa" }}>৭২ ঘণ্টা পর মুছে যায়</span>
+          <span className="text-[10px]" style={{ color: "var(--faint)" }}>৭২ ঘণ্টা পর মুছে যায়</span>
         </div>
       </div>
-      <div ref={listRef} className="flex-1 p-3 space-y-2 overflow-y-auto" style={{ background: dark ? "#14161A" : "#fafafa" }}>
+      <div ref={listRef} className="flex-1 p-3 space-y-3 overflow-y-auto" style={{
+        background: "radial-gradient(ellipse 600px 400px at 20% 0%, color-mix(in srgb, var(--accent) 6%, transparent), transparent 60%), var(--bg)",
+      }}>
         {messages === null ? (
-          <p className="text-sm" style={{ color: dark ? "#9aa1ad" : "#888" }}>লোড হচ্ছে…</p>
+          <p className="text-sm" style={{ color: "var(--faint)" }}>লোড হচ্ছে…</p>
         ) : messages.length === 0 ? (
-          <p className="text-sm" style={{ color: dark ? "#9aa1ad" : "#888" }}>এখনো কোনো মেসেজ নেই — প্রথম মেসেজটা আপনিই লিখুন!</p>
+          <p className="text-sm" style={{ color: "var(--faint)" }}>এখনো কোনো মেসেজ নেই — প্রথম মেসেজটা আপনিই লিখুন!</p>
         ) : (
-          messages.map((m) => (
-            <div key={m.id} className="flex items-start gap-2">
-              {m.sender_photo ? (
-                <img src={m.sender_photo} alt="" className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
-              ) : (
-                <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
-                  style={{ background: "var(--accent)", color: "#fff" }}>
-                  {(m.sender_name || "?").slice(0, 1).toUpperCase()}
+          messages.map((m) => {
+            const mine = m.sender_id === myId;
+            const byEmoji = reactionsFor(m.id);
+            const time = new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+            return (
+              <div key={m.id} className={`flex items-end gap-2 ${mine ? "flex-row-reverse" : ""}`}>
+                {!mine && (
+                  m.sender_photo ? (
+                    <img src={m.sender_photo} alt="" className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
+                  ) : (
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
+                      style={{ background: "var(--accent)", color: "#fff" }}>
+                      {(m.sender_name || "?").slice(0, 1).toUpperCase()}
+                    </div>
+                  )
+                )}
+                <div className="min-w-0" style={{ maxWidth: "78%" }}>
+                  {!mine && (
+                    <div className="flex items-baseline gap-2 mb-0.5 px-1">
+                      <span className="text-xs font-semibold" style={{ color: "var(--ink)" }}>{m.sender_name || "Anonymous"}</span>
+                      <span className="text-[10px]" style={{ color: "var(--faint)" }}>{time}</span>
+                    </div>
+                  )}
+                  <div className="px-3 py-2 rounded-2xl"
+                    style={mine ? {
+                      background: "linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 75%, black))",
+                      color: "#fff", borderBottomRightRadius: 5, boxShadow: "0 4px 14px color-mix(in srgb, var(--accent) 45%, transparent)",
+                    } : {
+                      background: "var(--panel)", backdropFilter: "blur(14px) saturate(140%)", WebkitBackdropFilter: "blur(14px) saturate(140%)",
+                      border: "1px solid var(--border)", color: "var(--ink)", borderBottomLeftRadius: 5,
+                    }}>
+                    {m.image_url && (
+                      <img src={m.image_url} alt="" className="rounded-lg mb-1 max-w-full block" style={{ maxHeight: 220, objectFit: "cover" }} />
+                    )}
+                    {m.message && <div className="text-sm break-words">{m.message}</div>}
+                    {mine && <div className="text-[10px] mt-0.5 text-right" style={{ opacity: 0.8 }}>{time}</div>}
+                  </div>
+                  <div className={`flex items-center gap-1 mt-1 px-0.5 ${mine ? "justify-end" : ""}`}>
+                    {REACTION_EMOJIS.map((em) => {
+                      const users = byEmoji[em] || [];
+                      const mineReacted = users.includes(myId);
+                      return (
+                        <button key={em} onClick={() => toggleReaction(m.id, em)}
+                          className="text-[11px] px-1.5 py-0.5 rounded-full flex items-center gap-0.5 flex-shrink-0"
+                          style={{
+                            background: mineReacted ? "color-mix(in srgb, var(--accent) 22%, transparent)" : "transparent",
+                            border: `1px solid ${mineReacted ? "var(--accent)" : "var(--border)"}`,
+                            color: "var(--muted)", opacity: users.length ? 1 : 0.5,
+                          }}>
+                          <span>{em}</span>{users.length > 0 && <span>{users.length}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              )}
-              <div className="min-w-0">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-xs font-semibold" style={{ color: dark ? "#fff" : "#241A12" }}>{m.sender_name || "Anonymous"}</span>
-                  <span className="text-[10px]" style={{ color: dark ? "#6b7280" : "#aaa" }}>
-                    {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                  </span>
-                </div>
-                <div className="text-sm break-words" style={{ color: dark ? "#d1d5db" : "#333" }}>{m.message}</div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
       {error && <p className="text-xs px-3 pt-1" style={{ color: "#e2725b" }}>{error}</p>}
-      <form onSubmit={submit} className="flex gap-2 p-2" style={{ borderTop: "1px solid var(--border)", background: dark ? "#1c1f26" : "#fff" }}>
+      <form onSubmit={submit} className="flex items-center gap-2 p-2" style={{
+        borderTop: "1px solid var(--border)", background: "linear-gradient(0deg, var(--panel), var(--surface))",
+        backdropFilter: "blur(18px) saturate(140%)", WebkitBackdropFilter: "blur(18px) saturate(140%)",
+      }}>
+        <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePickImage} style={{ display: "none" }} />
+        <button type="button" onClick={() => fileInputRef.current && fileInputRef.current.click()}
+          disabled={imageUploading} title="ছবি পাঠান"
+          className="flex-shrink-0 flex items-center justify-center rounded-full"
+          style={{ width: 36, height: 36, border: "1px solid var(--border)", color: "var(--muted)", opacity: imageUploading ? 0.5 : 1 }}>
+          {imageUploading ? "…" : "📷"}
+        </button>
         <input
           type="text" value={draft} onChange={(e) => setDraft(e.target.value)}
           placeholder="একটা মেসেজ লিখুন…" maxLength={500}
-          className="flex-1 text-sm px-3 py-2 rounded"
-          style={{ border: "1px solid var(--border)", background: dark ? "#14161A" : "#fafafa", color: dark ? "#fff" : "#241A12" }}
+          className="flex-1 text-sm px-3 py-2 rounded-full tk-field"
+          style={{ border: "1px solid var(--border)" }}
         />
         <button type="submit" disabled={sending || !draft.trim()}
-          className="text-sm font-semibold px-4 py-2 rounded"
+          className="text-sm font-semibold px-4 py-2 rounded-full flex-shrink-0"
           style={{ background: "var(--accent)", color: "#fff", opacity: sending || !draft.trim() ? 0.6 : 1 }}>
           পাঠান
         </button>
@@ -8088,7 +8323,7 @@ function ChatThread({ dark, userName, userPhoto, active, directory, onBack, onLe
             {memberIds.map((uid) => {
               const p = (directory || []).find((d) => d.user_id === uid);
               return (
-                <div key={uid} className="text-sm px-2 py-1.5 rounded" style={{ background: dark ? "#1c1f26" : "#fafafa" }}>
+                <div key={uid} className="text-sm px-2 py-1.5 rounded" style={{ background: "var(--surface)" }}>
                   {uid === myId ? "আপনি" : (p?.name || "Anonymous")}
                 </div>
               );
@@ -8297,6 +8532,7 @@ function App() {
   const [dayAdviceDismissed, setDayAdviceDismissed] = useState(false);
   const [profilePopoverOpen, setProfilePopoverOpen] = useState(false);
   const [profileEditOpen, setProfileEditOpen] = useState(false);
+  const [hasUnreadChat, setHasUnreadChat] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -8431,6 +8667,32 @@ function App() {
     }, 1500);
     return () => clearTimeout(t);
   }, [loaded, subjectsData, track, userName, userPhoto, userCollege, userBio, userSocials, userVisibility]);
+
+  // Keep a global "any unread chat message" flag so the Community icon in the sidebar /
+  // bottom nav can show a red dot even while the user is on a totally different tab.
+  useEffect(() => {
+    if (!loaded || !window.cloudSync || !window.cloudSync.enabled) return;
+    const cs = window.cloudSync;
+    let cancelled = false;
+    async function check() {
+      try {
+        const groups = await cs.fetchMyGroups();
+        const groupIds = groups.map((g) => g.id);
+        if (!groupIds.includes(COMMUNITY_GROUP_ID)) groupIds.push(COMMUNITY_GROUP_ID);
+        const [activity, readState] = await Promise.all([cs.fetchRecentActivity(groupIds), cs.fetchReadState()]);
+        if (cancelled) return;
+        const anyUnread = Object.keys(activity).some((key) => {
+          const last = activity[key];
+          const read = readState[key];
+          return last && (!read || last > read);
+        });
+        setHasUnreadChat(anyUnread);
+      } catch (e) {}
+    }
+    check();
+    const id = setInterval(check, 20000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [loaded, tab]);
 
   const saveUserName = async (name, photo) => {
     const trimmed = name.trim();
@@ -9061,10 +9323,19 @@ function App() {
           {MOBILE_TABS.map((t) => {
             const Icon = t.icon;
             const active = tab === t.id;
+            const showDot = t.id === "community" && hasUnreadChat;
             return (
               <button key={t.id} onClick={() => setTab(t.id)} title={sidebarCollapsed ? t.label : undefined}
-                className={`sidebar-item${active ? " active" : ""}`}>
-                <Icon size={19} style={{ flexShrink: 0 }} />
+                className={`sidebar-item${active ? " active" : ""}`} style={{ position: "relative" }}>
+                <span style={{ position: "relative", display: "inline-flex", flexShrink: 0 }}>
+                  <Icon size={19} />
+                  {showDot && (
+                    <span style={{
+                      position: "absolute", top: -3, right: -3, width: 8, height: 8, borderRadius: "50%",
+                      background: "#E5484D", border: "1.5px solid var(--panel)",
+                    }} />
+                  )}
+                </span>
                 <span className="sidebar-label truncate">{t.label}</span>
               </button>
             );
@@ -9479,7 +9750,7 @@ function App() {
         ) : tab === "analytics" ? (
           <AnalyticsTab subjectsData={subjectsData} calendarData={calendarData} track={track} dark={dark} predictedDates={predictedDates} officialDates={officialDates} />
         ) : tab === "community" ? (
-          <CommunityTab dark={dark} userName={userName} userPhoto={userPhoto} />
+          <CommunityTab dark={dark} userName={userName} userPhoto={userPhoto} track={track} />
         ) : (
           <GuideTab />
         )}
@@ -9494,11 +9765,20 @@ function App() {
         {MOBILE_TABS.map((t) => {
           const Icon = t.icon;
           const active = tab === t.id;
+          const showDot = t.id === "community" && hasUnreadChat;
           return (
             <button key={t.id} onClick={() => setTab(t.id)}
               className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2"
               style={{ color: active ? "var(--accent)" : "var(--muted-on-dark)", background: "none" }}>
-              <Icon size={19} />
+              <span style={{ position: "relative", display: "inline-flex" }}>
+                <Icon size={19} />
+                {showDot && (
+                  <span style={{
+                    position: "absolute", top: -2, right: -3, width: 8, height: 8, borderRadius: "50%",
+                    background: "#E5484D", border: "1.5px solid var(--ink-strong)",
+                  }} />
+                )}
+              </span>
               <span style={{ fontSize: 10, fontFamily: "Inter, sans-serif", fontWeight: active ? 700 : 500, letterSpacing: "0.01em" }}>{t.label}</span>
             </button>
           );
