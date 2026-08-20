@@ -339,6 +339,15 @@
         return data;
       },
 
+      // Full public-profile snapshot for one user — used by the "open profile" card
+      // (tap a name anywhere → see their progress, streak, bio, socials).
+      async fetchUserProfile(userId) {
+        if (!sb || !userId) return null;
+        const { data, error } = await sb.from("leaderboard_public").select("*").eq("user_id", userId).maybeSingle();
+        if (error || !data) return null;
+        return data;
+      },
+
       getUserId() { return currentUserId; },
 
       async fetchDirectory() {
@@ -7752,10 +7761,90 @@ const THEMES = [
 ];
 const THEME_IDS = THEMES.map((t) => t.id);
 
+// Shared "tap a name → see their overview" profile card. Works from the
+// leaderboard, chat friends/directory lists, and study-buddy suggestions —
+// anywhere a person's name appears, this shows their public progress snapshot.
+function ProfileModal({ profile, isMe, isFriend, requestSent, onClose, onMessage, onAddFriend }) {
+  if (!profile) return null;
+  return (
+    <ModalShell title="প্রোফাইল" subtitle={profile.name || "Anonymous"} onClose={onClose}>
+      <div className="flex items-center gap-3 mb-4">
+        {profile.photo ? (
+          <img src={profile.photo} alt="" className="w-14 h-14 rounded-full object-cover flex-shrink-0" />
+        ) : (
+          <div className="w-14 h-14 rounded-full flex items-center justify-center text-lg font-bold flex-shrink-0" style={{ background: "var(--accent)", color: "#fff" }}>
+            {(profile.name || "?").slice(0, 1).toUpperCase()}
+          </div>
+        )}
+        <div className="min-w-0">
+          <p className="text-base font-bold truncate" style={{ color: "var(--ink)" }}>{profile.name || "Anonymous"}</p>
+          <p className="text-xs" style={{ color: "var(--muted)" }}>{TRACK_SHORT_LABEL[profile.track] || profile.track}</p>
+        </div>
+      </div>
+
+      {profile.college && <p className="text-sm mb-1" style={{ color: "var(--ink)" }}>{profile.college}</p>}
+      {profile.bio && <p className="text-sm italic mb-3" style={{ color: "var(--muted)" }}>{profile.bio}</p>}
+
+      <div className="grid grid-cols-2 gap-2 mb-4">
+        <div className="p-2.5 rounded-lg text-center" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+          <p className="text-lg font-bold" style={{ color: "var(--accent)" }}>{Math.round(profile.overall_progress || 0)}%</p>
+          <p className="text-[10px]" style={{ color: "var(--faint)" }}>Overall progress</p>
+        </div>
+        <div className="p-2.5 rounded-lg text-center" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+          <p className="text-lg font-bold" style={{ color: "var(--ink)" }}>{profile.done_chapters || 0}/{profile.total_chapters || 0}</p>
+          <p className="text-[10px]" style={{ color: "var(--faint)" }}>Chapters</p>
+        </div>
+        <div className="p-2.5 rounded-lg text-center" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+          <p className="text-lg font-bold flex items-center justify-center gap-1" style={{ color: "#C6541A" }}>
+            <Flame size={14} color="#C6541A" />{profile.study_streak || 0}
+          </p>
+          <p className="text-[10px]" style={{ color: "var(--faint)" }}>Day streak</p>
+        </div>
+        <div className="p-2.5 rounded-lg text-center" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+          <p className="text-lg font-bold" style={{ color: "var(--ink)" }}>{profile.hours_this_week || 0}h</p>
+          <p className="text-[10px]" style={{ color: "var(--faint)" }}>This week</p>
+        </div>
+      </div>
+
+      {(profile.facebook || profile.instagram || profile.social_other) && (
+        <div className="flex gap-3 mb-4">
+          {profile.facebook && <a href={profile.facebook} target="_blank" rel="noreferrer" className="text-xs" style={{ color: "var(--accent)" }}>Facebook</a>}
+          {profile.instagram && <a href={profile.instagram} target="_blank" rel="noreferrer" className="text-xs" style={{ color: "var(--accent)" }}>Instagram</a>}
+          {profile.social_other && <a href={profile.social_other} target="_blank" rel="noreferrer" className="text-xs" style={{ color: "var(--accent)" }}>Link</a>}
+        </div>
+      )}
+
+      {!isMe && (onMessage || onAddFriend) && (
+        <div className="flex gap-2">
+          {onMessage && (
+            <button onClick={onMessage} className="flex-1 text-sm font-semibold px-3 py-2 rounded-lg" style={{ background: "var(--accent)", color: "#fff" }}>
+              মেসেজ পাঠান
+            </button>
+          )}
+          {onAddFriend && !isFriend && (
+            <button onClick={onAddFriend} disabled={requestSent}
+              className="flex-1 text-sm font-semibold px-3 py-2 rounded-lg"
+              style={{ border: "1px solid var(--border)", color: "var(--ink)", opacity: requestSent ? 0.6 : 1 }}>
+              {requestSent ? "অনুরোধ পাঠানো হয়েছে" : "+ বন্ধু"}
+            </button>
+          )}
+          {isFriend && !onMessage && (
+            <span className="flex-1 text-sm text-center px-3 py-2" style={{ color: "var(--muted)" }}>ইতিমধ্যে বন্ধু</span>
+          )}
+        </div>
+      )}
+    </ModalShell>
+  );
+}
+
 function CommunityTab({ dark, userName, userPhoto, track }) {
   const [rows, setRows] = useState(null);
   const [error, setError] = useState("");
   const [trackFilter, setTrackFilter] = useState(track || "all");
+  const [profileUser, setProfileUser] = useState(null);
+  const [friendMap, setFriendMap] = useState({});
+  const [requestSentIds, setRequestSentIds] = useState([]);
+  const [jumpToUserId, setJumpToUserId] = useState(null);
   const cs = window.cloudSync;
   const myId = cs && cs.getUserId ? cs.getUserId() : null;
 
@@ -7764,14 +7853,30 @@ function CommunityTab({ dark, userName, userPhoto, track }) {
   const refresh = useCallback(async () => {
     if (!window.cloudSync || !window.cloudSync.enabled) return;
     try {
-      const data = await window.cloudSync.fetchLeaderboard();
+      const [data, fm] = await Promise.all([
+        window.cloudSync.fetchLeaderboard(),
+        window.cloudSync.fetchFriendStatusMap(),
+      ]);
       setRows(data);
+      setFriendMap(fm);
     } catch (e) {
       setError("লিডারবোর্ড লোড করা যায়নি।");
     }
   }, []);
 
   useEffect(() => { refresh(); const id = setInterval(refresh, 30000); return () => clearInterval(id); }, [refresh]);
+
+  async function addFriend(userId) {
+    try {
+      await cs.sendFriendRequest(userId);
+      setRequestSentIds((prev) => [...prev, userId]);
+    } catch (e) {}
+  }
+
+  function messageUser(userId) {
+    setProfileUser(null);
+    setJumpToUserId(userId);
+  }
 
   if (!window.cloudSync || !window.cloudSync.enabled) {
     return <p style={{ color: dark ? "#9aa1ad" : "#666" }}>ক্লাউড সিঙ্ক কনফিগার করা নেই।</p>;
@@ -7872,7 +7977,7 @@ function CommunityTab({ dark, userName, userPhoto, track }) {
 
           {/* Study buddy match */}
           {buddy && (
-            <div className="mb-5 p-3 rounded-xl flex items-center gap-3" style={{
+            <div onClick={() => setProfileUser(buddy)} className="mb-5 p-3 rounded-xl flex items-center gap-3 cursor-pointer" style={{
               background: "var(--panel)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", border: "1px solid var(--border)",
             }}>
               {buddy.photo ? (
@@ -7898,7 +8003,7 @@ function CommunityTab({ dark, userName, userPhoto, track }) {
               {filteredRows.map((r, i) => {
                 const isMe = r.user_id === myId;
                 return (
-                  <div key={r.user_id} className="flex items-start gap-3 p-3 rounded-xl"
+                  <div key={r.user_id} onClick={() => setProfileUser(r)} className="flex items-start gap-3 p-3 rounded-xl cursor-pointer"
                     style={{
                       border: `1px solid ${isMe ? "var(--accent)" : "var(--border)"}`,
                       background: isMe
@@ -7937,7 +8042,7 @@ function CommunityTab({ dark, userName, userPhoto, track }) {
                         <div className="text-xs mt-0.5 italic" style={{ color: "var(--faint)" }}>{r.bio}</div>
                       )}
                       {(r.facebook || r.instagram || r.social_other) && (
-                        <div className="flex gap-2 mt-1">
+                        <div className="flex gap-2 mt-1" onClick={(e) => e.stopPropagation()}>
                           {r.facebook && <a href={r.facebook} target="_blank" rel="noreferrer" className="text-xs" style={{ color: "var(--accent)" }}>Facebook</a>}
                           {r.instagram && <a href={r.instagram} target="_blank" rel="noreferrer" className="text-xs" style={{ color: "var(--accent)" }}>Instagram</a>}
                           {r.social_other && <a href={r.social_other} target="_blank" rel="noreferrer" className="text-xs" style={{ color: "var(--accent)" }}>Link</a>}
@@ -7955,8 +8060,22 @@ function CommunityTab({ dark, userName, userPhoto, track }) {
 
       <div className="mt-8">
         <h2 className="text-lg font-bold mb-3" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>চ্যাট</h2>
-        <ChatHub dark={dark} userName={userName} userPhoto={userPhoto} myTrack={track} />
+        <ChatHub dark={dark} userName={userName} userPhoto={userPhoto} myTrack={track}
+          jumpToUserId={jumpToUserId} onJumpHandled={() => setJumpToUserId(null)}
+          onOpenProfile={(row) => setProfileUser(row)} />
       </div>
+
+      {profileUser && (
+        <ProfileModal
+          profile={profileUser}
+          isMe={profileUser.user_id === myId}
+          isFriend={friendMap[profileUser.user_id]?.state === "friends"}
+          requestSent={requestSentIds.includes(profileUser.user_id) || friendMap[profileUser.user_id]?.state === "pending_sent"}
+          onClose={() => setProfileUser(null)}
+          onMessage={() => messageUser(profileUser.user_id)}
+          onAddFriend={() => addFriend(profileUser.user_id)}
+        />
+      )}
     </div>
   );
 }
@@ -7966,7 +8085,7 @@ const COMMUNITY_GROUP_ID = "00000000-0000-0000-0000-000000000001";
 function convKeyForGroup(groupId) { return "g:" + groupId; }
 function convKeyForDM(myId, otherId) { return "dm:" + [myId, otherId].sort().join(":"); }
 
-function ChatHub({ dark, userName, userPhoto, myTrack }) {
+function ChatHub({ dark, userName, userPhoto, myTrack, jumpToUserId, onJumpHandled, onOpenProfile }) {
   const cs = window.cloudSync;
   const myId = cs.getUserId();
   const [directory, setDirectory] = useState([]);
@@ -7988,6 +8107,21 @@ function ChatHub({ dark, userName, userPhoto, myTrack }) {
     const stop = cs.startPresence(myId, userName, setOnlineIds);
     return stop;
   }, [myId, userName]);
+
+  // Jump straight into a DM with someone — used when "মেসেজ পাঠান" is pressed
+  // from a profile card opened outside this component (e.g. the leaderboard).
+  useEffect(() => {
+    if (!jumpToUserId) return;
+    const p = directory.find((d) => d.user_id === jumpToUserId);
+    openConversation({ type: "dm", recipientId: jumpToUserId, name: p?.name || "Anonymous" });
+    if (onJumpHandled) onJumpHandled();
+  }, [jumpToUserId, directory]);
+
+  async function openProfile(userId) {
+    if (!onOpenProfile) return;
+    const p = await cs.fetchUserProfile(userId);
+    if (p) onOpenProfile(p);
+  }
 
   const loadSidebar = useCallback(async () => {
     const [dir, gs, fm, inc, rs] = await Promise.all([
@@ -8116,15 +8250,16 @@ function ChatHub({ dark, userName, userPhoto, myTrack }) {
               const p = directory.find((d) => d.user_id === uid);
               const key = convKeyForDM(myId, uid);
               return (
-                <button key={uid} onClick={() => openConversation({ type: "dm", recipientId: uid, name: p?.name || "Anonymous" })}
-                  className="w-full text-left text-xs px-3 py-1.5 rounded-lg truncate flex items-center gap-1.5 justify-between"
+                <div key={uid} className="w-full text-left text-xs px-3 py-1.5 rounded-lg truncate flex items-center gap-1.5 justify-between"
                   style={navItemStyle(active.recipientId === uid)}>
-                  <span className="flex items-center gap-1.5 min-w-0 flex-1">
+                  <span className="flex items-center gap-1.5 min-w-0 flex-1 cursor-pointer" onClick={() => openConversation({ type: "dm", recipientId: uid, name: p?.name || "Anonymous" })}>
                     <OnlineDot uid={uid} />
                     <span className="truncate">{p?.name || "Anonymous"}</span>
                   </span>
                   {isUnread(key) && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: "var(--accent)" }} />}
-                </button>
+                  <button onClick={(e) => { e.stopPropagation(); openProfile(uid); }} title="প্রোফাইল দেখুন"
+                    className="text-[10px] flex-shrink-0" style={{ color: "var(--muted)" }}>ⓘ</button>
+                </div>
               );
             })}
           </div>
@@ -8137,7 +8272,7 @@ function ChatHub({ dark, userName, userPhoto, myTrack }) {
               <div key={d.user_id}
                 className="w-full text-left text-xs px-3 py-1.5 rounded-lg truncate flex items-center gap-1.5"
                 style={{ color: dark ? "#aaa" : "#666" }}>
-                <span className="flex items-center gap-1.5 min-w-0 flex-1 cursor-pointer" onClick={() => openConversation({ type: "dm", recipientId: d.user_id, name: d.name || "Anonymous" })}>
+                <span className="flex items-center gap-1.5 min-w-0 flex-1 cursor-pointer" onClick={() => openProfile(d.user_id)}>
                   <OnlineDot uid={d.user_id} />
                   <span className="truncate">{d.name || "Anonymous"}</span>
                 </span>
@@ -8162,12 +8297,15 @@ function ChatHub({ dark, userName, userPhoto, myTrack }) {
                 const key = convKeyForDM(myId, d.user_id);
                 return (
                   <div key={d.user_id}
-                    onClick={() => openConversation({ type: "dm", recipientId: d.user_id, name: d.name || "Anonymous" })}
                     className="w-full text-left text-xs px-3 py-1.5 rounded-lg truncate flex items-center gap-2 cursor-pointer"
                     style={navItemStyle(active.recipientId === d.user_id)}>
-                    <OnlineDot uid={d.user_id} />
-                    <span className="flex-1 truncate">{d.name || "Anonymous"}</span>
+                    <span className="flex items-center gap-2 min-w-0 flex-1" onClick={() => openConversation({ type: "dm", recipientId: d.user_id, name: d.name || "Anonymous" })}>
+                      <OnlineDot uid={d.user_id} />
+                      <span className="flex-1 truncate">{d.name || "Anonymous"}</span>
+                    </span>
                     {isUnread(key) && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "var(--accent)" }} />}
+                    <button onClick={(e) => { e.stopPropagation(); openProfile(d.user_id); }} title="প্রোফাইল দেখুন"
+                      className="text-[10px] flex-shrink-0" style={{ color: "var(--muted)" }}>ⓘ</button>
                     {friendButton(d.user_id)}
                   </div>
                 );
@@ -8184,6 +8322,7 @@ function ChatHub({ dark, userName, userPhoto, myTrack }) {
           directory={directory} myId={myId}
           onBack={() => setMobileThreadOpen(false)}
           onLeftGroup={() => { loadSidebar(); openConversation({ type: "group", groupId: COMMUNITY_GROUP_ID, name: "Community" }); }}
+          onOpenProfile={openProfile}
         />
       </div>
 
@@ -8231,7 +8370,7 @@ function ChatHub({ dark, userName, userPhoto, myTrack }) {
 
 const REACTION_EMOJIS = ["👍", "🔥", "❤️"];
 
-function ChatThread({ dark, userName, userPhoto, active, directory, myId: myIdProp, onBack, onLeftGroup }) {
+function ChatThread({ dark, userName, userPhoto, active, directory, myId: myIdProp, onBack, onLeftGroup, onOpenProfile }) {
   const cs = window.cloudSync;
   const [messages, setMessages] = useState(null);
   const [reactions, setReactions] = useState({});
@@ -8396,9 +8535,11 @@ function ChatThread({ dark, userName, userPhoto, active, directory, myId: myIdPr
               <div key={m.id} className={`flex items-end gap-2 ${mine ? "flex-row-reverse" : ""}`}>
                 {!mine && (
                   m.sender_photo ? (
-                    <img src={m.sender_photo} alt="" className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
+                    <img src={m.sender_photo} alt="" onClick={() => onOpenProfile && onOpenProfile(m.sender_id)}
+                      className="w-7 h-7 rounded-full object-cover flex-shrink-0 cursor-pointer" />
                   ) : (
-                    <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
+                    <div onClick={() => onOpenProfile && onOpenProfile(m.sender_id)}
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 cursor-pointer"
                       style={{ background: "var(--accent)", color: "#fff" }}>
                       {(m.sender_name || "?").slice(0, 1).toUpperCase()}
                     </div>
@@ -8407,7 +8548,7 @@ function ChatThread({ dark, userName, userPhoto, active, directory, myId: myIdPr
                 <div className="min-w-0" style={{ maxWidth: "78%" }}>
                   {!mine && (
                     <div className="flex items-baseline gap-2 mb-0.5 px-1">
-                      <span className="text-xs font-semibold" style={{ color: "var(--ink)" }}>{m.sender_name || "Anonymous"}</span>
+                      <span className="text-xs font-semibold cursor-pointer" onClick={() => onOpenProfile && onOpenProfile(m.sender_id)} style={{ color: "var(--ink)" }}>{m.sender_name || "Anonymous"}</span>
                       <span className="text-[10px]" style={{ color: "var(--faint)" }}>{time}</span>
                     </div>
                   )}
