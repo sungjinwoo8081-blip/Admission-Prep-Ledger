@@ -3530,6 +3530,16 @@ function ChaptersTab({ subjectsData, setChapterData, track, setTrack, dark, cale
 /* ---------------------------------------------------------------
    CALENDAR TAB
 ----------------------------------------------------------------*/
+const CALENDAR_TOUR_STEPS = [
+  { target: null, title: "Calendar ট্যাবে স্বাগতম 🗓️", body: "এখানে প্রতিদিনের চ্যাপ্টার প্ল্যান, ক্লাস/রুটিন, পরীক্ষা, ঘুম আর মুড — সব একসাথে এক জায়গায় দেখা আর এডিট করা যায়।" },
+  { target: "[data-tour='cal-snap']", title: "Snap study plan", body: "একটা তারিখের রেঞ্জ বেছে নিলে সেই সময়ের study plan (calendar view বা detailed list হিসেবে) একটা PNG ছবি হয়ে ডাউনলোড হয়ে যাবে — শেয়ার করা বা প্রিন্ট করার জন্য সুবিধাজনক।" },
+  { target: "[data-tour='cal-grid']", title: "মাসের ক্যালেন্ডার", body: "কোনো তারিখে ট্যাপ করলে ডানপাশে সেই দিনের ডিটেইল দেখাবে। ছোট গোল বিন্দু = subject-এর প্ল্যান, চারকোনা বিন্দু = ক্লাস/রুটিন, ⭐ = পরীক্ষা লগ করা আছে, ✓ = সব কাজ শেষ — সবকিছু এক নজরে বোঝা যাবে।" },
+  { target: "[data-tour='cal-day']", title: "সিলেক্ট করা দিনের ডিটেইল", body: "এখানে সেই দিনের পরীক্ষা, চ্যাপ্টার প্ল্যান (টিক দিয়ে 'done as planned' মার্ক করতে পারবে), আর রুটিন/ক্লাসের তালিকা দেখাবে — প্রতিটাতেই টিক দেয়া যায়।" },
+  { target: "[data-tour='cal-sleep']", title: "ঘুমের হিসাব", body: "কালকে রাতে কখন ঘুমিয়েছিলে আর আজ কখন উঠেছ — সেটা বসালেই মোট ঘুমের ঘণ্টা অটোমেটিক হিসাব হয়ে যাবে। খেয়াল করো: 'went to bed' মানে আগের রাতের সময়।" },
+  { target: "[data-tour='cal-reflection']", title: "দিনটা কেমন গেল?", body: "ছোট একটা নোট লিখে রাখতে পারো — পরে ফিরে দেখলে কোন দিনগুলো কেমন গিয়েছিল বুঝতে সুবিধা হবে।" },
+  { target: "[data-tour='cal-mood']", title: "মুড", body: "দিনের শেষে একটা মুড সেট করো — এটাই Overview ট্যাবের 'Last 7 days' রঙিন প্যাটার্নে দেখা যায়।" },
+];
+
 function CalendarTab({ calendarData, setDayData, mixedExams, routines, routineChecks, setRoutineChecks, weekStartDay, dark, userName, userPhoto }) {
   const [cursor, setCursor] = useState(new Date());
   const [selected, setSelected] = useState(fmtDate(new Date()));
@@ -3590,6 +3600,8 @@ function CalendarTab({ calendarData, setDayData, mixedExams, routines, routineCh
   const reflectionDirty = reflectionDraft !== (day.reflection || "");
   const saveReflection = () => update({ reflection: reflectionDraft });
 
+  const tour = useTabTour("calendar");
+
   return (
     <div>
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
@@ -3597,9 +3609,16 @@ function CalendarTab({ calendarData, setDayData, mixedExams, routines, routineCh
           <p className="text-sm font-semibold" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>Calendar</p>
           <p className="text-xs" style={{ color: "var(--faint)" }}>Per-day chapter study plans, exams, and routine — all in one view.</p>
         </div>
-        <button onClick={() => setSnapOpen((v) => !v)} className="text-xs font-semibold px-2.5 py-1.5 rounded flex items-center gap-1" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>
-          <Camera size={13} /> Snap study plan
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button onClick={() => setSnapOpen((v) => !v)} data-tour="cal-snap" className="text-xs font-semibold px-2.5 py-1.5 rounded flex items-center gap-1" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>
+            <Camera size={13} /> Snap study plan
+          </button>
+          <button onClick={tour.replay} className="text-xs font-semibold px-2 py-1.5 rounded flex-shrink-0 flex items-center gap-1"
+            style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--accent)", border: "1px solid var(--border)", background: "var(--surface)" }}
+            title="Replay the Calendar guide">
+            <HelpCircle size={12} /> guide
+          </button>
+        </div>
       </div>
 
       {snapOpen && (
@@ -3634,7 +3653,7 @@ function CalendarTab({ calendarData, setDayData, mixedExams, routines, routineCh
       )}
 
     <div className="grid md:grid-cols-2 gap-6">
-      <div>
+      <div data-tour="cal-grid">
         <div className="flex items-center justify-between mb-3">
           <button onClick={() => setCursor(new Date(year, month - 1, 1))}><ArrowLeft size={18} /></button>
           <p className="font-semibold" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>
@@ -3695,6 +3714,7 @@ function CalendarTab({ calendarData, setDayData, mixedExams, routines, routineCh
       <div>
         <p className="text-sm font-semibold mb-2" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>{selected}</p>
 
+        <div data-tour="cal-day">
         {examsOnSelected.map((e) => {
           const t = examStats(e);
           return (
@@ -3746,8 +3766,9 @@ function CalendarTab({ calendarData, setDayData, mixedExams, routines, routineCh
             </div>
           );
         })}
+        </div>
 
-        <div className="p-2 mb-3 rounded border" style={{ borderColor: "var(--divider)", background: "var(--panel)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)" }}>
+        <div className="p-2 mb-3 rounded border" data-tour="cal-sleep" style={{ borderColor: "var(--divider)", background: "var(--panel)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)" }}>
           <p className="text-xs font-semibold mb-2 flex items-center gap-1.5" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>
             <Clock size={13} /> Sleep
           </p>
@@ -3774,15 +3795,17 @@ function CalendarTab({ calendarData, setDayData, mixedExams, routines, routineCh
         </div>
 
         <p className="text-xs mb-1" style={{ color: "var(--muted)" }}>how did the day go?</p>
-        <textarea value={reflectionDraft} onChange={(e) => setReflectionDraft(e.target.value)}
-          className="w-full text-sm rounded border p-2 mb-1.5 tk-field" style={{ borderColor: "var(--border)", fontFamily: "Inter, sans-serif" }} rows={2} />
-        <button onClick={saveReflection} disabled={!reflectionDirty}
-          className="text-xs font-semibold px-3 py-1 rounded mb-3"
-          style={{ background: reflectionDirty ? "var(--ink-strong)" : "var(--surface)", color: reflectionDirty ? "var(--on-ink)" : "var(--faint)", border: "1px solid var(--border)", cursor: reflectionDirty ? "pointer" : "default" }}>
-          {reflectionDirty ? "save" : "saved"}
-        </button>
+        <div data-tour="cal-reflection">
+          <textarea value={reflectionDraft} onChange={(e) => setReflectionDraft(e.target.value)}
+            className="w-full text-sm rounded border p-2 mb-1.5 tk-field" style={{ borderColor: "var(--border)", fontFamily: "Inter, sans-serif" }} rows={2} />
+          <button onClick={saveReflection} disabled={!reflectionDirty}
+            className="text-xs font-semibold px-3 py-1 rounded mb-3"
+            style={{ background: reflectionDirty ? "var(--ink-strong)" : "var(--surface)", color: reflectionDirty ? "var(--on-ink)" : "var(--faint)", border: "1px solid var(--border)", cursor: reflectionDirty ? "pointer" : "default" }}>
+            {reflectionDirty ? "save" : "saved"}
+          </button>
+        </div>
 
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap" data-tour="cal-mood">
           {MOODS.map((m) => {
             const Icon = m.icon;
             const active = day.mood === m.id;
@@ -3797,6 +3820,8 @@ function CalendarTab({ calendarData, setDayData, mixedExams, routines, routineCh
         </div>
       </div>
     </div>
+
+    <TourGuide tourId="calendar" steps={CALENDAR_TOUR_STEPS} active={tour.active && !snapOpen} onDone={tour.stop} />
     </div>
   );
 }
@@ -5136,6 +5161,13 @@ function SyllabusSubjectBlock({ subject, selectedIds, onToggleChapter, onToggleA
 
 /* SECTION (a) — plan an exam: name, date, track, exam type, total marks, syllabus.
    No marks are entered here; that happens afterward in the results panel. */
+const EXAM_PLAN_TOUR_STEPS = [
+  { target: null, title: "Plan Exam", body: "আসন্ন যেকোনো পরীক্ষা (weekly, model test, board exam) এখানে প্ল্যান করে রাখো — নাম, তারিখ, ট্র্যাক, টাইপ, মোট মার্ক আর কোন কোন চ্যাপ্টার থেকে আসবে। মার্ক পরে 'Marks & Trend' থেকে বসাবে।" },
+  { target: "[data-tour='ep-form']", title: "পরীক্ষার তথ্য", body: "নাম আর তারিখ দাও, কোন ট্র্যাকের (Engineering/Medical/Varsity/IBA) আর কী ধরনের (weekly/model ইত্যাদি) পরীক্ষা সেটা বেছে নাও, আর মোট মার্ক বসাও।" },
+  { target: "[data-tour='ep-syllabus']", title: "সিলেবাস বাছাই", body: "কোন কোন চ্যাপ্টার থেকে পরীক্ষাটা হবে সেটা টিক দিয়ে বেছে নাও — পুরো সাবজেক্ট একসাথে বা আলাদা আলাদা চ্যাপ্টার, দুইভাবেই সিলেক্ট করা যায়। এটা Calendar আর Overview-এ পরীক্ষার প্রিভিউতে দেখাবে।" },
+  { target: "[data-tour='ep-share']", title: "Export / Import exam plan", body: "প্ল্যান করা পরীক্ষার তালিকা (মার্ক ছাড়া) টেক্সট হিসেবে বন্ধুর সাথে শেয়ার করতে পারবে, অথবা বন্ধুর পাঠানোটা এখানে ইমপোর্ট করতে পারবে।" },
+];
+
 function ExamPlanPanel({ mixedExams, setMixedExams, track }) {
   const blankForm = () => ({ name: "", date: fmtDate(new Date()), examTrack: track, examType: EXAM_TYPES[0], totalMarks: "", subjects: [] });
   const [form, setForm] = useState(blankForm);
@@ -5219,13 +5251,15 @@ function ExamPlanPanel({ mixedExams, setMixedExams, track }) {
 
   const visibleSubjects = trackVisibleSubjects(form.examTrack);
 
+  const tour = useTabTour("exam-plan");
+
   return (
     <div>
       <p className="text-sm font-semibold mb-1" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>Plan a new exam</p>
       <p className="text-xs mb-4" style={{ color: "var(--faint)" }}>Set the date, type, total marks and syllabus here. Marks (yours and anyone you're comparing against) get logged afterward, in "Marks & Trend".</p>
 
       <div className="p-3 rounded-lg mb-6" style={{ background: "var(--panel)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", border: "1px solid var(--divider)" }}>
-        <div className="flex gap-2 mb-2 flex-wrap">
+        <div className="flex gap-2 mb-2 flex-wrap" data-tour="ep-form">
           <TinyInput placeholder="exam name e.g. Udvash Weekly-12" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} style={{ flex: "1 1 200px" }} />
           <TinyInput type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} />
         </div>
@@ -5241,7 +5275,7 @@ function ExamPlanPanel({ mixedExams, setMixedExams, track }) {
           <TinyInput type="number" placeholder="total marks" value={form.totalMarks} onChange={(e) => setForm((f) => ({ ...f, totalMarks: e.target.value }))} style={{ width: 110 }} />
         </div>
         <p className="text-xs mb-1.5" style={{ color: "var(--muted)" }}>syllabus</p>
-        <div className="space-y-1.5 mb-3">
+        <div className="space-y-1.5 mb-3" data-tour="ep-syllabus">
           {visibleSubjects.map((s) => {
             const entry = form.subjects.find((x) => x.subjectId === s.id);
             return (
@@ -5253,7 +5287,7 @@ function ExamPlanPanel({ mixedExams, setMixedExams, track }) {
         <button onClick={save} className="w-full text-sm font-semibold py-2 rounded" style={{ background: "var(--ink-strong)", color: "var(--on-ink)", fontFamily: "Inter, sans-serif" }}>save exam plan</button>
       </div>
 
-      <div className="flex gap-2 mb-6">
+      <div className="flex gap-2 mb-6" data-tour="ep-share">
         <button onClick={() => setPlanShareModal("export")} className="flex-1 text-xs font-semibold py-2 rounded flex items-center justify-center gap-1.5"
           style={{ background: "var(--surface)", color: "var(--ink)", border: "1px solid var(--border)", fontFamily: "Inter, sans-serif" }}>
           <Share2 size={13} /> Export exam plan
@@ -5288,6 +5322,7 @@ function ExamPlanPanel({ mixedExams, setMixedExams, track }) {
           </div>
         </div>
       )}
+      <TourGuide tourId="exam-plan" steps={EXAM_PLAN_TOUR_STEPS} active={tour.active && !planShareModal} onDone={tour.stop} />
     </div>
   );
 }
@@ -5331,6 +5366,14 @@ function SnapPeoplePickerModal({ trackLabel, people, userName, onConfirm, onClos
   );
 }
 
+const EXAM_RESULTS_TOUR_STEPS = [
+  { target: null, title: "Marks & Trend", body: "প্ল্যান করা প্রতিটা পরীক্ষার মার্ক এখানে বসাবে, আর নিজের প্রোগ্রেসের ট্রেন্ড লাইন (এবং চাইলে বন্ধুদের সাথে তুলনা) দেখবে।" },
+  { target: "[data-tour='er-people']", title: "Compare people", body: "যাদের সাথে নিজের মার্ক তুলনা করতে চাও (বন্ধু/প্রতিদ্বন্দ্বী), তাদের নাম এখানে যোগ করো — তাহলে প্রতিটা পরীক্ষায় তাদের মার্কও বসানোর অপশন আসবে।" },
+  { target: "[data-tour='er-snap']", title: "Snap", body: "মার্কসহ বা মার্ক ছাড়া — দুইভাবেই পরীক্ষার তালিকার একটা PNG ছবি ডাউনলোড করা যায়।" },
+  { target: "[data-tour='er-list']", title: "পরীক্ষার তালিকা ও মার্ক এন্ট্রি", body: "প্রতিটা পরীক্ষার পাশে নিজের প্রাপ্ত মার্ক বসাও (আর কম্পেয়ার করা মানুষদেরও, যদি থাকে) — % অটোমেটিক হিসাব হয়ে যাবে।" },
+  { target: "[data-tour='er-trend']", title: "ট্রেন্ড চার্ট", body: "একই ট্র্যাকে অন্তত ২টা পরীক্ষার মার্ক বসালে এখানে একটা লাইন চার্টে নিজের (আর তুলনা করা মানুষদের) প্রোগ্রেস ট্র্যাক দেখা যাবে। প্রতিটা চার্টের নিজস্ব 'Snap' বাটন দিয়ে ছবি ডাউনলোডও করা যায়।" },
+];
+
 function ExamResultsPanel({ mixedExams, setMixedExams, comparePeople, setComparePeople, dark, userName, userPhoto }) {
   const theme = chartTheme(dark);
   const descSorted = [...mixedExams].sort((a, b) => (a.date < b.date ? 1 : -1));
@@ -5343,6 +5386,8 @@ function ExamResultsPanel({ mixedExams, setMixedExams, comparePeople, setCompare
   const updPersonMark = (exam, personId, val) => updExam(exam.id, { peopleMarks: { ...exam.peopleMarks, [personId]: val } });
 
   const activePeople = (comparePeople || []).filter((p) => mixedExams.some((e) => e.peopleMarks && e.peopleMarks[p.id] !== undefined && e.peopleMarks[p.id] !== ""));
+
+  const tour = useTabTour("exam-results");
 
   const confirmTrendSnap = (trackId, { includeYou, personIds }) => {
     const t = TRACKS.find((tt) => tt.id === trackId);
@@ -5388,11 +5433,13 @@ function ExamResultsPanel({ mixedExams, setMixedExams, comparePeople, setCompare
 
   return (
     <div>
-      <PeoplePanel comparePeople={comparePeople} setComparePeople={setComparePeople} />
+      <div data-tour="er-people">
+        <PeoplePanel comparePeople={comparePeople} setComparePeople={setComparePeople} />
+      </div>
 
       <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
         <p className="text-sm font-semibold" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>Planned / logged exams</p>
-        <div className="flex gap-2">
+        <div className="flex gap-2" data-tour="er-snap">
           <button onClick={() => downloadExamPlanSnap({ mixedExams, comparePeople, dark, userName, userPhoto, withMarks: true, label: personalizedSnapLabel(userName, "Exam Marks") })}
             className="text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5"
             style={{ background: "var(--surface)", color: "var(--ink)", border: "1px solid var(--border)", fontFamily: "Inter, sans-serif" }}>
@@ -5405,7 +5452,7 @@ function ExamResultsPanel({ mixedExams, setMixedExams, comparePeople, setCompare
           </button>
         </div>
       </div>
-      <div className="space-y-3 mb-6">
+      <div className="space-y-3 mb-6" data-tour="er-list">
         {descSorted.map((exam) => {
           const stats = examStats(exam, comparePeople);
           const trackLabel = TRACKS.find((t) => t.id === exam.examTrack)?.label || exam.examTrack;
@@ -5443,7 +5490,7 @@ function ExamResultsPanel({ mixedExams, setMixedExams, comparePeople, setCompare
       </div>
 
       {ascSorted.length > 1 && (
-        <div>
+        <div data-tour="er-trend">
           <p className="text-sm font-semibold mb-1 flex items-center gap-2" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>
             <TrendingUp size={16} /> Marks trend — you vs competitors
           </p>
@@ -5509,9 +5556,14 @@ function ExamResultsPanel({ mixedExams, setMixedExams, comparePeople, setCompare
           onConfirm={(selection) => confirmTrendSnap(snapPickerTrackId, selection)}
         />
       )}
+      <TourGuide tourId="exam-results" steps={EXAM_RESULTS_TOUR_STEPS} active={tour.active && !snapPickerTrackId} onDone={tour.stop} />
     </div>
   );
 }
+
+const EXAM_TRACKER_TOUR_STEPS = [
+  { target: "[data-tour='ex-sections']", title: "Exam Tracker-এর ৩টা অংশ", body: "'Plan Exam' দিয়ে আসন্ন পরীক্ষা প্ল্যান করবে, 'Marks & Trend'-এ মার্ক বসিয়ে ট্রেন্ড দেখবে, আর 'Exam Routine'-এ পরীক্ষা-সংক্রান্ত রুটিন (রিভিশন ব্লক, মডেল টেস্ট ইত্যাদি) রাখবে। প্রতিটা অংশে প্রথমবার গেলে আলাদা করে একটা ছোট গাইড দেখাবে।" },
+];
 
 function ExamsTab({ mixedExams, setMixedExams, comparePeople, setComparePeople, examRoutines, setExamRoutines, examRoutineChecks, setExamRoutineChecks, track, dark, userName, userPhoto }) {
   const [section, setSection] = useState("plan"); // "plan" | "results" | "routine"
@@ -5520,21 +5572,29 @@ function ExamsTab({ mixedExams, setMixedExams, comparePeople, setComparePeople, 
     ["results", "Marks & Trend"],
     ["routine", "Exam Routine"],
   ];
+  const tour = useTabTour("exam-tracker");
   return (
     <div>
-      <div className="flex gap-2 mb-5 flex-wrap">
-        {SECTIONS.map(([key, label]) => (
-          <button key={key} onClick={() => setSection(key)}
-            className="text-xs font-semibold px-3 py-1.5 rounded-full"
-            style={{
-              fontFamily: "JetBrains Mono, monospace",
-              background: section === key ? "var(--ink-strong)" : "var(--surface)",
-              color: section === key ? "var(--on-ink)" : "var(--ink-soft)",
-              border: `1px solid ${section === key ? "var(--ink-strong)" : "var(--border)"}`,
-            }}>
-            {label}
-          </button>
-        ))}
+      <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
+        <div className="flex gap-2 flex-wrap" data-tour="ex-sections">
+          {SECTIONS.map(([key, label]) => (
+            <button key={key} onClick={() => setSection(key)}
+              className="text-xs font-semibold px-3 py-1.5 rounded-full"
+              style={{
+                fontFamily: "JetBrains Mono, monospace",
+                background: section === key ? "var(--ink-strong)" : "var(--surface)",
+                color: section === key ? "var(--on-ink)" : "var(--ink-soft)",
+                border: `1px solid ${section === key ? "var(--ink-strong)" : "var(--border)"}`,
+              }}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <button onClick={tour.replay} className="text-xs font-semibold px-2 py-1 rounded flex-shrink-0 flex items-center gap-1"
+          style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--accent)", border: "1px solid var(--border)", background: "var(--surface)" }}
+          title="Replay the Exam Tracker guide">
+          <HelpCircle size={12} /> guide
+        </button>
       </div>
       {section === "plan" && <ExamPlanPanel mixedExams={mixedExams} setMixedExams={setMixedExams} track={track} />}
       {section === "results" && (
@@ -5543,6 +5603,7 @@ function ExamsTab({ mixedExams, setMixedExams, comparePeople, setComparePeople, 
       {section === "routine" && (
         <ExamRoutinePanel examRoutines={examRoutines} setExamRoutines={setExamRoutines} examRoutineChecks={examRoutineChecks} setExamRoutineChecks={setExamRoutineChecks} mixedExams={mixedExams} dark={dark} userName={userName} userPhoto={userPhoto} />
       )}
+      <TourGuide tourId="exam-tracker" steps={EXAM_TRACKER_TOUR_STEPS} active={tour.active} onDone={tour.stop} />
     </div>
   );
 }
@@ -5550,6 +5611,14 @@ function ExamsTab({ mixedExams, setMixedExams, comparePeople, setComparePeople, 
 /* SECTION (c) — a mini, exam-only version of the Routine tab: recurring or one-off
    items (revision blocks, coaching test days, anything exam-prep related), kept
    separate from the general Routine tab. */
+const EXAM_ROUTINE_TOUR_STEPS = [
+  { target: null, title: "Exam Routine", body: "পরীক্ষা-সংক্রান্ত রিভিশন ব্লক, কোচিং টেস্ট ডে, বা অন্য যেকোনো রিমাইন্ডার এখানে রাখো — এটা সাধারণ Routine ট্যাব থেকে আলাদা, খালি পরীক্ষার প্রস্তুতির জন্য।" },
+  { target: "[data-tour='err-share']", title: "Export / Import / Snap", body: "নিজের এক্সাম রুটিন টেক্সট হিসেবে শেয়ার করতে বা বন্ধুরটা ইমপোর্ট করতে পারবে, আর 'Snap' দিয়ে একটা তারিখ রেঞ্জের ছবি ডাউনলোড করা যায়।" },
+  { target: "[data-tour='err-today']", title: "আজকের আইটেম", body: "আজকের জন্য যা যা প্ল্যান করা আছে (রুটিন আইটেম + আজকের কোনো পরীক্ষা থাকলে সেটাও) এখানে চেকলিস্ট আকারে দেখাবে।" },
+  { target: "[data-tour='err-add']", title: "নতুন আইটেম যোগ করা", body: "টাইটেল লিখে, তারিখ বা সাপ্তাহিক পুনরাবৃত্তি (recurring) সেট করে যোগ করো — ঠিক Routine ট্যাবের মতোই কাজ করে।" },
+  { target: "[data-tour='err-list']", title: "পুরো তালিকা", body: "প্ল্যান করা সব পরীক্ষা (হালকা ধূসর, শুধু দেখা যায়, এখান থেকে এডিট হয় না — সেটা 'Plan Exam' থেকে করতে হবে) আর তোমার যোগ করা এক্সাম-রুটিন আইটেম (এডিট/ডিলিট করা যায়) — সব একসাথে এখানে।" },
+];
+
 function ExamRoutinePanel({ examRoutines, setExamRoutines, examRoutineChecks, setExamRoutineChecks, mixedExams, dark, userName, userPhoto }) {
   const blankForm = { title: "", note: "", recurring: false, daysOfWeek: [], startDate: "", endDate: "", date: fmtDate(new Date()) };
   const [form, setForm] = useState(blankForm);
@@ -5675,6 +5744,8 @@ function ExamRoutinePanel({ examRoutines, setExamRoutines, examRoutineChecks, se
     return ka < kb ? -1 : ka > kb ? 1 : 0;
   });
 
+  const tour = useTabTour("exam-routine");
+
   return (
     <div>
       <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
@@ -5683,14 +5754,21 @@ function ExamRoutinePanel({ examRoutines, setExamRoutines, examRoutineChecks, se
           <p className="text-xs" style={{ color: "var(--faint)" }}>Recurring or one-off items tied to exam prep — revision blocks, coaching test days, anything you want reminded of. Kept separate from the general Routine tab.</p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
-          <button onClick={() => setShareModal("export")} className="text-xs font-semibold px-2.5 py-1.5 rounded flex items-center gap-1" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>
-            <Share2 size={13} /> Export
-          </button>
-          <button onClick={() => setShareModal("import")} className="text-xs font-semibold px-2.5 py-1.5 rounded flex items-center gap-1" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>
-            <Upload size={13} /> Import
-          </button>
-          <button onClick={() => setSnapOpen((v) => !v)} className="text-xs font-semibold px-2.5 py-1.5 rounded flex items-center gap-1" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>
-            <Camera size={13} /> Snap
+          <div className="flex items-center gap-2 flex-wrap" data-tour="err-share">
+            <button onClick={() => setShareModal("export")} className="text-xs font-semibold px-2.5 py-1.5 rounded flex items-center gap-1" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>
+              <Share2 size={13} /> Export
+            </button>
+            <button onClick={() => setShareModal("import")} className="text-xs font-semibold px-2.5 py-1.5 rounded flex items-center gap-1" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>
+              <Upload size={13} /> Import
+            </button>
+            <button onClick={() => setSnapOpen((v) => !v)} className="text-xs font-semibold px-2.5 py-1.5 rounded flex items-center gap-1" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>
+              <Camera size={13} /> Snap
+            </button>
+          </div>
+          <button onClick={tour.replay} className="text-xs font-semibold px-2 py-1.5 rounded flex-shrink-0 flex items-center gap-1"
+            style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--accent)", border: "1px solid var(--border)", background: "var(--surface)" }}
+            title="Replay this section's guide">
+            <HelpCircle size={12} /> guide
           </button>
         </div>
       </div>
@@ -5730,7 +5808,7 @@ function ExamRoutinePanel({ examRoutines, setExamRoutines, examRoutineChecks, se
       )}
 
       {todaysItems.length > 0 && (
-        <div className="mb-5">
+        <div className="mb-5" data-tour="err-today">
           <p className="text-xs font-semibold mb-2 uppercase" style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--muted)", letterSpacing: 0.4 }}>Today · {today}</p>
           <div className="space-y-2">
             {todaysItems.map((item) => (
@@ -5741,7 +5819,7 @@ function ExamRoutinePanel({ examRoutines, setExamRoutines, examRoutineChecks, se
         </div>
       )}
 
-      <div className="p-3 rounded-lg mb-6" style={{ background: "var(--panel)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", border: "1px solid var(--divider)" }}>
+      <div className="p-3 rounded-lg mb-6" data-tour="err-add" style={{ background: "var(--panel)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", border: "1px solid var(--divider)" }}>
         <button onClick={() => setAddFormOpen((v) => !v)} type="button" className="w-full flex items-center justify-between gap-2">
           <span className="text-xs font-semibold" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>Add exam routine item</span>
           {addFormOpen ? <ChevronDown size={14} color="var(--muted)" /> : <ChevronRight size={14} color="var(--muted)" />}
@@ -5785,7 +5863,7 @@ function ExamRoutinePanel({ examRoutines, setExamRoutines, examRoutineChecks, se
         )}
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-2" data-tour="err-list">
         {sorted.map((item) => (
           <RoutineCard key={item.id} item={item} checked={null} onToggle={null}
             onUpdate={item.fromExam ? () => {} : (patch) => updateRoutine(item, patch)} onDelete={item.fromExam ? () => {} : () => deleteRoutine(item)} readOnly={!!item.fromExam} />
@@ -5822,6 +5900,7 @@ function ExamRoutinePanel({ examRoutines, setExamRoutines, examRoutineChecks, se
           </button>
         </ModalShell>
       )}
+      <TourGuide tourId="exam-routine" steps={EXAM_ROUTINE_TOUR_STEPS} active={tour.active && !snapOpen && !shareModal} onDone={tour.stop} />
     </div>
   );
 }
@@ -6089,6 +6168,17 @@ function WeeklyPlanSection({ subjectsData, track, weeklyPlans, setWeeklyPlans, w
   );
 }
 
+const ROUTINE_TOUR_STEPS = [
+  { target: null, title: "Routine ট্যাবে স্বাগতম 🔁", body: "এখানে ক্লাস আর অন্যান্য নিয়মিত অ্যাক্টিভিটি (কোচিং, প্র্যাক্টিস ইত্যাদি) ট্র্যাক করবে। একবার সেট করলে এগুলো রোজ Calendar-এও দেখাবে।" },
+  { target: "[data-tour='rt-snap']", title: "Snap", body: "একটা তারিখ রেঞ্জ বেছে ক্লাস/পরীক্ষা/অন্যান্য রুটিনের একটা রঙিন PNG ছবি ডাউনলোড করতে পারবে — calendar-grid অথবা detailed list ফরম্যাটে।" },
+  { target: "[data-tour='rt-share']", title: "Export / Import routine", body: "নিজের পুরো রুটিন (শুধু টেমপ্লেট — কমপ্লিশন হিস্ট্রি বা মার্ক ছাড়া) টেক্সট হিসেবে কপি করে বন্ধুকে পাঠাতে পারবে 'Export' দিয়ে, আর বন্ধুর পাঠানো রুটিন 'Import' দিয়ে নিজেরটায় যোগ করতে পারবে (ডুপ্লিকেট আইটেম বাদ পড়ে যায় অটোমেটিক)।" },
+  { target: "[data-tour='rt-today']", title: "আজকের আইটেম", body: "আজকের দিনের সব ক্লাস/রুটিন এখানে চেকলিস্ট আকারে দেখাবে — টিক দিলেই 'done' হয়ে যাবে।" },
+  { target: "[data-tour='rt-weekly']", title: "সাপ্তাহিক প্ল্যান", body: "এখানে পুরো সপ্তাহের জন্য চ্যাপ্টার-ওয়াইজ স্টাডি প্ল্যান বানাতে পারবে — এটাই Overview ট্যাবের 'This week's plan'-এ দেখা যায়।" },
+  { target: "[data-tour='rt-add']", title: "রুটিনে নতুন আইটেম যোগ করা", body: "Class না অন্য কিছু (Other) সেটা বেছে নাও, নাম/টপিক লেখো, অনলাইন/অফলাইন বেছে নাও (ক্লাসের জন্য)। 'recurring' টিক দিলে সপ্তাহের নির্দিষ্ট দিনগুলোতে (যেমন শনি-সোম-বুধ) প্রতি সপ্তাহে রিপিট হবে, নয়তো একটা নির্দিষ্ট দিনের জন্য একবার সেট হবে।" },
+  { target: "[data-tour='rt-filters']", title: "ফিল্টার", body: "ক্যাটাগরি, অনলাইন/অফলাইন, বা তারিখ রেঞ্জ দিয়ে নিচের লিস্ট থেকে খুঁজে বের করো — অনেকগুলো আইটেম জমে গেলে কাজে লাগবে।" },
+  { target: "[data-tour='rt-list']", title: "পুরো রুটিন লিস্ট", body: "সব রুটিন আইটেম এখানে — প্রতিটাতে এডিট বা ডিলিট করার অপশন আছে (কার্ডের নিজস্ব বাটনে)।" },
+];
+
 function RoutineTab({ routines, setRoutines, routineChecks, setRoutineChecks, mixedExams, calendarData, track, dark, userName, userPhoto, subjectsData, weeklyPlans, setWeeklyPlans, weekStartDay, loaded }) {
   const blankForm = { kind: "class", title: "", mode: "offline", note: "", recurring: false, daysOfWeek: [], startDate: "", endDate: "", date: fmtDate(new Date()) };
   const [form, setForm] = useState(blankForm);
@@ -6221,6 +6311,8 @@ function RoutineTab({ routines, setRoutines, routineChecks, setRoutineChecks, mi
     return ka < kb ? -1 : ka > kb ? 1 : 0;
   });
 
+  const tour = useTabTour("routine");
+
   return (
     <div>
       <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
@@ -6229,14 +6321,21 @@ function RoutineTab({ routines, setRoutines, routineChecks, setRoutineChecks, mi
           <p className="text-xs" style={{ color: "var(--faint)" }}>Classes and other regular activity — shown as a checklist here and on the Calendar tab. Exams live in the Exam tab now.</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => setSnapOpen((v) => !v)} className="text-xs font-semibold px-2.5 py-1.5 rounded flex items-center gap-1" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>
+          <button onClick={() => setSnapOpen((v) => !v)} data-tour="rt-snap" className="text-xs font-semibold px-2.5 py-1.5 rounded flex items-center gap-1" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>
             <Camera size={13} /> Snap
           </button>
-          <button onClick={() => setShareModal("export")} className="text-xs font-semibold px-2.5 py-1.5 rounded flex items-center gap-1" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>
-            <Share2 size={13} /> Export routine
-          </button>
-          <button onClick={() => setShareModal("import")} className="text-xs font-semibold px-2.5 py-1.5 rounded flex items-center gap-1" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>
-            <Upload size={13} /> Import routine
+          <div className="flex gap-2" data-tour="rt-share">
+            <button onClick={() => setShareModal("export")} className="text-xs font-semibold px-2.5 py-1.5 rounded flex items-center gap-1" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>
+              <Share2 size={13} /> Export routine
+            </button>
+            <button onClick={() => setShareModal("import")} className="text-xs font-semibold px-2.5 py-1.5 rounded flex items-center gap-1" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>
+              <Upload size={13} /> Import routine
+            </button>
+          </div>
+          <button onClick={tour.replay} className="text-xs font-semibold px-2 py-1.5 rounded flex-shrink-0 flex items-center gap-1"
+            style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--accent)", border: "1px solid var(--border)", background: "var(--surface)" }}
+            title="Replay the Routine guide">
+            <HelpCircle size={12} /> guide
           </button>
         </div>
       </div>
@@ -6276,7 +6375,7 @@ function RoutineTab({ routines, setRoutines, routineChecks, setRoutineChecks, mi
       )}
 
       {todaysItems.length > 0 && (
-        <div className="mb-5 mt-3">
+        <div className="mb-5 mt-3" data-tour="rt-today">
           <p className="text-xs font-semibold mb-2 uppercase" style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--muted)", letterSpacing: 0.4 }}>Today · {today}</p>
           <div className="space-y-2">
             {todaysItems.map((item) => (
@@ -6287,9 +6386,11 @@ function RoutineTab({ routines, setRoutines, routineChecks, setRoutineChecks, mi
         </div>
       )}
 
-      <WeeklyPlanSection subjectsData={subjectsData} track={track} weeklyPlans={weeklyPlans} setWeeklyPlans={setWeeklyPlans} weekStartDay={weekStartDay} dark={dark} userName={userName} userPhoto={userPhoto} loaded={loaded} mixedExams={mixedExams} />
+      <div data-tour="rt-weekly">
+        <WeeklyPlanSection subjectsData={subjectsData} track={track} weeklyPlans={weeklyPlans} setWeeklyPlans={setWeeklyPlans} weekStartDay={weekStartDay} dark={dark} userName={userName} userPhoto={userPhoto} loaded={loaded} mixedExams={mixedExams} />
+      </div>
 
-      <div className="p-3 rounded-lg mb-6 mt-4" style={{ background: "var(--panel)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", border: "1px solid var(--divider)" }}>
+      <div className="p-3 rounded-lg mb-6 mt-4" data-tour="rt-add" style={{ background: "var(--panel)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", border: "1px solid var(--divider)" }}>
         <p className="text-xs font-semibold mb-2" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>Add to routine</p>
         <div className="flex gap-2 mb-2 flex-wrap">
           <select value={form.kind} onChange={(e) => setForm((f) => ({ ...blankForm, kind: e.target.value, title: f.title, note: f.note }))}
@@ -6345,7 +6446,7 @@ function RoutineTab({ routines, setRoutines, routineChecks, setRoutineChecks, mi
         <button onClick={saveRoutine} className="w-full text-sm font-semibold py-2 rounded" style={{ background: "var(--ink-strong)", color: "var(--on-ink)" }}>add to routine</button>
       </div>
 
-      <div className="flex gap-2 mb-3 flex-wrap">
+      <div className="flex gap-2 mb-3 flex-wrap" data-tour="rt-filters">
         <select value={filterKind} onChange={(e) => setFilterKind(e.target.value)} className="text-xs rounded border px-2 py-1.5 tk-field" style={{ borderColor: "var(--border)" }}>
           <option value="all">All categories</option>
           <option value="class">Class</option>
@@ -6360,7 +6461,7 @@ function RoutineTab({ routines, setRoutines, routineChecks, setRoutineChecks, mi
         <TinyInput type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-2" data-tour="rt-list">
         {sortedFiltered.map((item) => (
           <RoutineCard key={item.id} item={item} checked={null} onToggle={null}
             onUpdate={(patch) => updateRoutine(item, patch)} onDelete={() => deleteRoutine(item)} />
@@ -6397,6 +6498,7 @@ function RoutineTab({ routines, setRoutines, routineChecks, setRoutineChecks, mi
           </button>
         </ModalShell>
       )}
+      <TourGuide tourId="routine" steps={ROUTINE_TOUR_STEPS} active={tour.active && !snapOpen && !shareModal} onDone={tour.stop} />
     </div>
   );
 }
