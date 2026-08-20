@@ -1282,6 +1282,32 @@ function hoursLoggedOnDate(subjectsData, dateStr) {
   return Math.round(total * 10) / 10;
 }
 
+// Consecutive days (counting back from today) with any logged study activity —
+// used for the community leaderboard's streak badge.
+function computeActivityStreak(subjectsData) {
+  let streak = 0;
+  for (let i = 0; i < 365; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const hours = hoursLoggedOnDate(subjectsData, fmtDate(d));
+    if (hours > 0) streak++;
+    else if (i === 0) continue; // today not logged yet doesn't break the streak
+    else break;
+  }
+  return streak;
+}
+
+// Total hours logged in the last 7 days — feeds the weekly community challenge.
+function hoursLoggedThisWeek(subjectsData) {
+  let total = 0;
+  for (let i = 0; i < 7; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    total += hoursLoggedOnDate(subjectsData, fmtDate(d));
+  }
+  return Math.round(total * 10) / 10;
+}
+
 const uid = () => Math.random().toString(36).slice(2, 10);
 
 function defaultChapterState(subject) {
@@ -7729,6 +7755,11 @@ const THEME_IDS = THEMES.map((t) => t.id);
 function CommunityTab({ dark, userName, userPhoto, track }) {
   const [rows, setRows] = useState(null);
   const [error, setError] = useState("");
+  const [trackFilter, setTrackFilter] = useState(track || "all");
+  const cs = window.cloudSync;
+  const myId = cs && cs.getUserId ? cs.getUserId() : null;
+
+  useEffect(() => { setTrackFilter(track || "all"); }, [track]);
 
   const refresh = useCallback(async () => {
     if (!window.cloudSync || !window.cloudSync.enabled) return;
@@ -7746,58 +7777,184 @@ function CommunityTab({ dark, userName, userPhoto, track }) {
     return <p style={{ color: dark ? "#9aa1ad" : "#666" }}>ক্লাউড সিঙ্ক কনফিগার করা নেই।</p>;
   }
 
+  const allRows = rows || [];
+  const filteredRows = trackFilter === "all" ? allRows : allRows.filter((r) => r.track === trackFilter);
+  const myRow = allRows.find((r) => r.user_id === myId) || null;
+  const myRank = filteredRows.findIndex((r) => r.user_id === myId);
+
+  const weeklyTop = [...filteredRows]
+    .filter((r) => (r.hours_this_week || 0) > 0)
+    .sort((a, b) => (b.hours_this_week || 0) - (a.hours_this_week || 0))
+    .slice(0, 3);
+  const MEDALS = ["🥇", "🥈", "🥉"];
+
+  // Study buddy — same track, closest overall progress to yours (so it's a fair match, not a leader vs. beginner).
+  let buddy = null;
+  if (myRow) {
+    const candidates = allRows.filter((r) => r.user_id !== myId && r.track === myRow.track);
+    let bestDiff = Infinity;
+    candidates.forEach((r) => {
+      const diff = Math.abs((r.overall_progress || 0) - (myRow.overall_progress || 0));
+      if (diff < bestDiff) { bestDiff = diff; buddy = r; }
+    });
+  }
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold" style={{ color: dark ? "#fff" : "#241A12" }}>কে কতদূর — কমিউনিটি প্রোগ্রেস</h2>
-        <button onClick={refresh} className="text-xs px-2 py-1 rounded" style={{ border: "1px solid var(--border)" }}>রিফ্রেশ</button>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-lg font-bold" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>কে কতদূর — কমিউনিটি প্রোগ্রেস</h2>
+        <button onClick={refresh} className="text-xs px-2 py-1 rounded-full" style={{ border: "1px solid var(--border)", color: "var(--muted)" }}>রিফ্রেশ</button>
       </div>
+
+      {/* Track filter pills */}
+      <div className="flex gap-1.5 mb-4 flex-wrap">
+        <button onClick={() => setTrackFilter("all")}
+          className="text-xs px-3 py-1.5 rounded-full font-semibold"
+          style={{
+            background: trackFilter === "all" ? "var(--accent)" : "var(--surface)",
+            color: trackFilter === "all" ? "#fff" : "var(--muted)",
+            border: `1px solid ${trackFilter === "all" ? "var(--accent)" : "var(--border)"}`,
+          }}>সবাই</button>
+        {TRACKS.map((t) => (
+          <button key={t.id} onClick={() => setTrackFilter(t.id)}
+            className="text-xs px-3 py-1.5 rounded-full font-semibold"
+            style={{
+              background: trackFilter === t.id ? "var(--accent)" : "var(--surface)",
+              color: trackFilter === t.id ? "#fff" : "var(--muted)",
+              border: `1px solid ${trackFilter === t.id ? "var(--accent)" : "var(--border)"}`,
+            }}>{TRACK_SHORT_LABEL[t.id] || t.id}</button>
+        ))}
+      </div>
+
       {error && <p className="text-sm mb-2" style={{ color: "#e2725b" }}>{error}</p>}
+
       {rows === null ? (
-        <p style={{ color: dark ? "#9aa1ad" : "#666" }}>লোড হচ্ছে…</p>
-      ) : rows.length === 0 ? (
-        <p style={{ color: dark ? "#9aa1ad" : "#666" }}>এখনো কেউ ডেটা শেয়ার করেনি।</p>
+        <p style={{ color: "var(--faint)" }}>লোড হচ্ছে…</p>
       ) : (
-        <div className="space-y-2">
-          {rows.map((r, i) => (
-            <div key={r.user_id} className="flex items-start gap-3 p-3 rounded"
-              style={{ border: "1px solid var(--border)", background: dark ? "#1c1f26" : "#fff" }}>
-              <div className="text-sm font-bold w-6 text-center" style={{ color: dark ? "#9aa1ad" : "#999" }}>{i + 1}</div>
-              {r.photo ? (
-                <img src={r.photo} alt="" className="w-9 h-9 rounded-full object-cover" />
+        <React.Fragment>
+          {/* Your rank */}
+          {myRow && myRank >= 0 && (
+            <div className="mb-4 px-4 py-2.5 rounded-xl flex items-center justify-between" style={{
+              background: "linear-gradient(135deg, color-mix(in srgb, var(--accent) 22%, transparent), color-mix(in srgb, var(--accent) 6%, transparent))",
+              border: "1px solid color-mix(in srgb, var(--accent) 40%, transparent)",
+            }}>
+              <span className="text-sm font-semibold" style={{ color: "var(--ink)" }}>
+                তুমি এখন <span style={{ color: "var(--accent)" }}>#{myRank + 1}</span> নম্বরে
+                {trackFilter !== "all" ? ` (${TRACK_SHORT_LABEL[trackFilter] || trackFilter})` : ""}
+              </span>
+              {typeof myRow.study_streak === "number" && myRow.study_streak > 0 && (
+                <span className="text-xs flex items-center gap-1" style={{ color: "#C6541A" }}>
+                  <Flame size={13} color="#C6541A" /> {myRow.study_streak} দিন streak
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Weekly challenge */}
+          {weeklyTop.length > 0 && (
+            <div className="mb-5 p-3 rounded-xl" style={{
+              background: "var(--panel)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", border: "1px solid var(--border)",
+            }}>
+              <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--muted)" }}>
+                🏆 এই সপ্তাহের চ্যালেঞ্জ — সবচেয়ে বেশি ঘণ্টা পড়েছে যারা
+              </p>
+              <div className="space-y-1.5">
+                {weeklyTop.map((r, i) => (
+                  <div key={r.user_id} className="flex items-center gap-2 text-sm">
+                    <span style={{ width: 20 }}>{MEDALS[i]}</span>
+                    <span className="flex-1 truncate" style={{ color: "var(--ink)" }}>{r.user_id === myId ? "তুমি" : (r.name || "Anonymous")}</span>
+                    <span className="text-xs font-semibold" style={{ color: "var(--accent)" }}>{r.hours_this_week}h</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Study buddy match */}
+          {buddy && (
+            <div className="mb-5 p-3 rounded-xl flex items-center gap-3" style={{
+              background: "var(--panel)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", border: "1px solid var(--border)",
+            }}>
+              {buddy.photo ? (
+                <img src={buddy.photo} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
               ) : (
-                <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold"
-                  style={{ background: "var(--accent)", color: "#fff" }}>
-                  {(r.name || "?").slice(0, 1).toUpperCase()}
+                <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0" style={{ background: "var(--accent)", color: "#fff" }}>
+                  {(buddy.name || "?").slice(0, 1).toUpperCase()}
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold truncate" style={{ color: dark ? "#fff" : "#241A12" }}>{r.name || "Anonymous"}</div>
-                <div className="text-xs" style={{ color: dark ? "#9aa1ad" : "#888" }}>
-                  {r.track} · {r.done_chapters}/{r.total_chapters} chapters · সর্বশেষ সক্রিয়: {new Date(r.updated_at).toLocaleDateString()}
-                </div>
-                {r.college && (
-                  <div className="text-xs mt-0.5" style={{ color: dark ? "#a8b0bd" : "#777" }}>{r.college}</div>
-                )}
-                {r.bio && (
-                  <div className="text-xs mt-0.5 italic" style={{ color: dark ? "#8b93a1" : "#999" }}>{r.bio}</div>
-                )}
-                {(r.facebook || r.instagram || r.social_other) && (
-                  <div className="flex gap-2 mt-1">
-                    {r.facebook && <a href={r.facebook} target="_blank" rel="noreferrer" className="text-xs" style={{ color: "var(--accent)" }}>Facebook</a>}
-                    {r.instagram && <a href={r.instagram} target="_blank" rel="noreferrer" className="text-xs" style={{ color: "var(--accent)" }}>Instagram</a>}
-                    {r.social_other && <a href={r.social_other} target="_blank" rel="noreferrer" className="text-xs" style={{ color: "var(--accent)" }}>Link</a>}
-                  </div>
-                )}
+                <p className="text-xs font-semibold uppercase tracking-wide mb-0.5" style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--muted)" }}>স্টাডি বাডি সাজেশন</p>
+                <p className="text-sm truncate" style={{ color: "var(--ink)" }}>
+                  <b>{buddy.name || "Anonymous"}</b> — প্রায় একই progress-এ আছে ({Math.round(buddy.overall_progress || 0)}%), একসাথে পড়লে ভালো ম্যাচ হতে পারে
+                </p>
               </div>
-              <div className="text-sm font-bold" style={{ color: "var(--accent)" }}>{Math.round(r.overall_progress)}%</div>
             </div>
-          ))}
-        </div>
+          )}
+
+          {filteredRows.length === 0 ? (
+            <p style={{ color: "var(--faint)" }}>এই ট্র্যাকে এখনো কেউ ডেটা শেয়ার করেনি।</p>
+          ) : (
+            <div className="space-y-2">
+              {filteredRows.map((r, i) => {
+                const isMe = r.user_id === myId;
+                return (
+                  <div key={r.user_id} className="flex items-start gap-3 p-3 rounded-xl"
+                    style={{
+                      border: `1px solid ${isMe ? "var(--accent)" : "var(--border)"}`,
+                      background: isMe
+                        ? "linear-gradient(135deg, color-mix(in srgb, var(--accent) 14%, transparent), color-mix(in srgb, var(--accent) 4%, transparent))"
+                        : "var(--panel)",
+                      backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)",
+                      boxShadow: isMe ? "0 0 16px color-mix(in srgb, var(--accent) 25%, transparent)" : "none",
+                    }}>
+                    <div className="text-sm font-bold w-6 text-center flex-shrink-0" style={{ color: "var(--faint)" }}>{i + 1}</div>
+                    {r.photo ? (
+                      <img src={r.photo} alt="" className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
+                    ) : (
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                        style={{ background: "var(--accent)", color: "#fff" }}>
+                        {(r.name || "?").slice(0, 1).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold truncate flex items-center gap-1.5" style={{ color: "var(--ink)" }}>
+                        {isMe ? "তুমি" : (r.name || "Anonymous")}
+                        {typeof r.study_streak === "number" && r.study_streak > 0 && (
+                          <span className="text-[10px] flex items-center gap-0.5 flex-shrink-0" style={{ color: "#C6541A" }}>
+                            <Flame size={11} color="#C6541A" />{r.study_streak}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs" style={{ color: "var(--muted)" }}>
+                        {TRACK_SHORT_LABEL[r.track] || r.track} · {r.done_chapters}/{r.total_chapters} chapters
+                        {typeof r.hours_this_week === "number" && r.hours_this_week > 0 ? ` · এই সপ্তাহে ${r.hours_this_week}h` : ""}
+                        {" · সর্বশেষ সক্রিয়: "}{new Date(r.updated_at).toLocaleDateString()}
+                      </div>
+                      {r.college && (
+                        <div className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>{r.college}</div>
+                      )}
+                      {r.bio && (
+                        <div className="text-xs mt-0.5 italic" style={{ color: "var(--faint)" }}>{r.bio}</div>
+                      )}
+                      {(r.facebook || r.instagram || r.social_other) && (
+                        <div className="flex gap-2 mt-1">
+                          {r.facebook && <a href={r.facebook} target="_blank" rel="noreferrer" className="text-xs" style={{ color: "var(--accent)" }}>Facebook</a>}
+                          {r.instagram && <a href={r.instagram} target="_blank" rel="noreferrer" className="text-xs" style={{ color: "var(--accent)" }}>Instagram</a>}
+                          {r.social_other && <a href={r.social_other} target="_blank" rel="noreferrer" className="text-xs" style={{ color: "var(--accent)" }}>Link</a>}
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-sm font-bold flex-shrink-0" style={{ color: "var(--accent)" }}>{Math.round(r.overall_progress)}%</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </React.Fragment>
       )}
 
       <div className="mt-8">
-        <h2 className="text-lg font-bold mb-3" style={{ color: dark ? "#fff" : "#241A12" }}>চ্যাট</h2>
+        <h2 className="text-lg font-bold mb-3" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>চ্যাট</h2>
         <ChatHub dark={dark} userName={userName} userPhoto={userPhoto} myTrack={track} />
       </div>
     </div>
@@ -8663,10 +8820,42 @@ function App() {
         overall_progress: overallProgress,
         done_chapters: doneChapters,
         total_chapters: totalChapters,
+        study_streak: computeActivityStreak(subjectsData),
+        hours_this_week: hoursLoggedThisWeek(subjectsData),
       });
     }, 1500);
     return () => clearTimeout(t);
   }, [loaded, subjectsData, track, userName, userPhoto, userCollege, userBio, userSocials, userVisibility]);
+
+  // Auto-celebrate milestones (every 5 chapters completed) with a message in the
+  // Community group chat — keeps a local list of already-celebrated milestones so
+  // it only posts once per threshold.
+  useEffect(() => {
+    if (!loaded || !window.cloudSync || !window.cloudSync.enabled) return;
+    (async () => {
+      const visibleSubjects = SUBJECTS.filter((s) => TRACKS.find((tr) => tr.id === track).subjects.includes(s.id));
+      let doneChapters = 0;
+      visibleSubjects.forEach((s) => {
+        s.chapters.forEach((c) => {
+          if (chapterProgress(subjectsData[s.id]?.[c.id]) >= 100) doneChapters++;
+        });
+      });
+      const MILESTONE_STEP = 5;
+      const reached = Math.floor(doneChapters / MILESTONE_STEP) * MILESTONE_STEP;
+      if (reached < MILESTONE_STEP) return;
+      const celebrated = (await loadKey("celebrated-milestones")) || [];
+      if (celebrated.includes(reached)) return;
+      try {
+        await window.cloudSync.sendMessage({
+          groupId: COMMUNITY_GROUP_ID,
+          message: `🎉 ${userName || "একজন সহপাঠী"} মাত্র ${reached}টা চ্যাপ্টার শেষ করলো — অভিনন্দন! 🔥`,
+          name: userName || "Anonymous",
+          photo: userPhoto || null,
+        });
+        await saveKey("celebrated-milestones", [...celebrated, reached]);
+      } catch (e) {}
+    })();
+  }, [loaded, subjectsData, track, userName, userPhoto]);
 
   // Keep a global "any unread chat message" flag so the Community icon in the sidebar /
   // bottom nav can show a red dot even while the user is on a totally different tab.
