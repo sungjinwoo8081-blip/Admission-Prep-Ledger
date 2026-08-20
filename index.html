@@ -2777,6 +2777,19 @@ const ACTIVITY_TYPE_LABEL = { class: "CLASS", qbank: "Q-BANK", self: "SELF STUDY
 const ACTIVITY_TYPE_COLOR = { class: "var(--accent2, #3B4C9B)", qbank: "#96741F", self: "#2E7D5B", exam: "#8C3B2E" };
 const TEACHER_PRESETS = { Physics: ["Chinmoy Saha"], Math: ["Abhi Dada"], Chemistry: [], Biology: [], Grammar: [], "Vocab & RC": [], "IBA Math": [], "Analytical & Writing": [] };
 
+const CHAPTER_MODAL_TOUR_STEPS = [
+  { target: null, title: "চ্যাপ্টার ডিটেইল স্ক্রিন", body: "প্রতিটা চ্যাপ্টারে ট্যাপ করলে এই স্ক্রিনটা খোলে — এখান থেকেই ওই চ্যাপ্টারের সবকিছু ট্র্যাক করবে: স্ট্যাটাস, পড়ার লগ, কনফিডেন্স, ওয়েট, ফর্মুলা সব। চলো ঘুরিয়ে দেখাই।" },
+  { target: "[data-tour='cm-progress']", title: "প্রোগ্রেস বার", body: "স্ট্যাটাস + কনফিডেন্স + activity log মিলিয়ে এই চ্যাপ্টারের সামগ্রিক progress % এখানে অটোমেটিক হিসাব হয়ে দেখায়।" },
+  { target: "[data-tour='cm-daily']", title: "Daily focus চ্যাপ্টার", body: "কোনো চ্যাপ্টার যদি প্রতিদিন revise করতে চাও (যেমন দুর্বল টপিক), এখানে 'on' করে দাও — এটা Overview আর Study ট্যাবের 'Study daily' লিস্টে প্রতিদিন দেখাবে, আর টিক দিলে streak গোনা হবে।" },
+  { target: "[data-tour='cm-plan']", title: "স্টাডি প্ল্যান", body: "একটা তারিখ আর নোট দিয়ে এই চ্যাপ্টারের জন্য প্ল্যান বসাও (যেমন 'রবিবার এই চ্যাপ্টার শেষ করব')। এই প্ল্যান Calendar ট্যাবেও দেখা যাবে, কিন্তু এডিট শুধু এখান থেকেই করা যায়।" },
+  { target: "[data-tour='cm-status']", title: "স্ট্যাটাস", body: "চ্যাপ্টারটা এখনো শুরু করোনি, পড়া চলছে, নাকি মাস্টার হয়ে গেছে — এখান থেকে সেট করো। 'Mastered' করলে সেটা Formula Sheet আর revision-tracking-এ যুক্ত হয়ে যায়।" },
+  { target: "[data-tour='cm-activity']", title: "Activity log — এখানেই সব ঘণ্টার হিসাব", body: "'+ add entry' চেপে ক্লাস, প্রশ্নব্যাংক (qbank), বা নিজে-নিজে পড়া (self) — তিন ধরনের সেশন লগ করতে পারবে। প্রতিটার সাথে তারিখ, মিনিট, (ঐচ্ছিক) সময়, শিক্ষকের নাম/বইয়ের নাম, আর 'opinion' নোট যোগ করা যায়। এই লগ থেকেই actual hours আর pace হিসাব হয়।" },
+  { target: "[data-tour='cm-confidence']", title: "কনফিডেন্স (১–৫)", body: "নিজের আত্মবিশ্বাস কতটা সেটা ১ থেকে ৫-এ রেট করো। কম কনফিডেন্স + 'in progress' status থাকলে সেটা Chapters ট্যাবের 'Weak flags' কাউন্টে ধরা পড়ে, যাতে দুর্বল জায়গাগুলো আলাদা করে চেনা যায়।" },
+  { target: "[data-tour='cm-weight']", title: "Exam weight", body: "পরীক্ষায় এই চ্যাপ্টারের গুরুত্ব কম/মাঝারি/বেশি — এটাই Overview-এর 'Needs attention' র‍্যাঙ্কিং-এ সবচেয়ে বড় ফ্যাক্টর হিসেবে কাজ করে।" },
+  { target: "[data-tour='cm-formula']", title: "কি ফর্মুলা", body: "চ্যাপ্টার মাস্টার করার সময় এখানে গুরুত্বপূর্ণ ফর্মুলাগুলো টুকে রাখো — এগুলো সব মিলিয়ে একটা Formula Sheet-এ জমা হবে (রিভিশনের জন্য কাজে লাগবে)।" },
+  { target: null, title: "গাইড আবার দেখতে চাইলে", body: "উপরে 'close'-এর ঠিক পাশে একটা ছোট 'guide' বাটন আছে — যেকোনো চ্যাপ্টার খুলে চাপলেই এই ট্যুর আবার শুরু হবে।" },
+];
+
 function ChapterModal({ chapter, subject, data, onChange, onClose, chapterPlans, addChapterPlan, removeChapterPlan }) {
   const set = (patch) => onChange({ ...data, ...patch });
   const [showAdd, setShowAdd] = useState(false);
@@ -2845,6 +2858,8 @@ function ChapterModal({ chapter, subject, data, onChange, onClose, chapterPlans,
   };
   const delEntry = (id) => set({ activities: (data.activities || []).filter((a) => a.id !== id) });
 
+  const openChapterTour = useTabTour("chapter-modal");
+
   return (
     <div className="fixed inset-0 z-30 flex items-start justify-center overflow-y-auto p-4 sm:p-8"
       style={{ background: "var(--overlay)" }}
@@ -2854,6 +2869,9 @@ function ChapterModal({ chapter, subject, data, onChange, onClose, chapterPlans,
         border: `1px solid ${subject.accent}`,
       }}>
         <button onClick={onClose} className="absolute top-4 right-4 text-xs" style={{ color: "var(--muted)", fontFamily: "JetBrains Mono, monospace" }}>✕ close</button>
+        <button onClick={openChapterTour.replay} className="absolute top-4 right-16 text-xs flex items-center gap-1" style={{ color: subject.accent, fontFamily: "JetBrains Mono, monospace" }} title="Replay this modal's guide">
+          <HelpCircle size={12} /> guide
+        </button>
         <p className="text-xs mb-1" style={{ fontFamily: "JetBrains Mono, monospace", color: subject.accent }}>{subject.short.toUpperCase()} · CH {String(subject.chapters.findIndex((c) => c.id === chapter.id) + 1).padStart(2, "0")}</p>
         <p className="text-lg font-bold pr-16 mb-0.5" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>{chapter.en}</p>
         <p className="text-xs mb-2" style={{ color: "var(--faint)" }}>{chapter.bn}</p>
@@ -2863,14 +2881,14 @@ function ChapterModal({ chapter, subject, data, onChange, onClose, chapterPlans,
             <RotateCcw size={12} /> revision due — {daysSince === null ? "never revisited since mastering" : `${daysSince}d since last touched`}
           </div>
         )}
-        <div className="flex items-center gap-3 mb-5">
+        <div className="flex items-center gap-3 mb-5" data-tour="cm-progress">
           <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--divider)" }}>
             <div className="h-full rounded-full" style={{ width: `${progress}%`, background: subject.accent }} />
           </div>
           <span className="text-xs" style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--muted)" }}>{Math.round(progress)}%</span>
         </div>
 
-        <div className="flex items-center justify-between mb-4 p-2.5 rounded" style={{ background: data.daily ? "rgba(198,84,26,0.09)" : "var(--surface)", border: `1px solid ${data.daily ? "#C6541A" : "var(--border)"}` }}>
+        <div className="flex items-center justify-between mb-4 p-2.5 rounded" data-tour="cm-daily" style={{ background: data.daily ? "rgba(198,84,26,0.09)" : "var(--surface)", border: `1px solid ${data.daily ? "#C6541A" : "var(--border)"}` }}>
           <div className="flex items-center gap-1.5 text-xs" style={{ color: data.daily ? "#C6541A" : "var(--muted)" }}>
             <Flame size={14} color={data.daily ? "#C6541A" : "var(--faint-icon)"} />
             <span>daily focus chapter — study this every day</span>
@@ -2883,7 +2901,7 @@ function ChapterModal({ chapter, subject, data, onChange, onClose, chapterPlans,
           }}>{data.daily ? "on" : "off"}</button>
         </div>
 
-        <div className="mb-4 p-2.5 rounded" style={{ background: "rgba(59,76,155,0.07)", border: `1px solid ${subject.accent}55` }}>
+        <div className="mb-4 p-2.5 rounded" data-tour="cm-plan" style={{ background: "rgba(59,76,155,0.07)", border: `1px solid ${subject.accent}55` }}>
           <p className="text-xs uppercase tracking-wide mb-1.5" style={{ fontFamily: "JetBrains Mono, monospace", color: subject.accent }}>study plan</p>
           <div className="flex gap-1.5 mb-2 flex-wrap">
             <TinyInput type="date" value={planDate} onChange={(e) => setPlanDate(e.target.value)} style={{ flex: 1, minWidth: 130 }} />
@@ -2907,7 +2925,7 @@ function ChapterModal({ chapter, subject, data, onChange, onClose, chapterPlans,
 
         <div className="mb-4">
           <p className="text-xs uppercase tracking-wide mb-1.5" style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--muted)" }}>status</p>
-          <div className="flex gap-1.5">
+          <div className="flex gap-1.5" data-tour="cm-status">
             {STATUS_OPTS.map(([v, label]) => (
               <button key={v} onClick={() => set({ status: v })} className="flex-1 text-xs rounded px-2 py-1.5" style={{
                 fontFamily: "JetBrains Mono, monospace",
@@ -2919,7 +2937,7 @@ function ChapterModal({ chapter, subject, data, onChange, onClose, chapterPlans,
           </div>
         </div>
 
-        <div className="mb-4">
+        <div className="mb-4" data-tour="cm-activity">
           <div className="flex items-center justify-between mb-1.5">
             <p className="text-xs uppercase tracking-wide" style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--muted)" }}>activity log</p>
             <span className="text-xs" style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--muted)" }}>total actual: <b style={{ color: subject.accent }}>{actual}h</b></span>
@@ -3013,7 +3031,7 @@ function ChapterModal({ chapter, subject, data, onChange, onClose, chapterPlans,
 
         <div className="mb-4">
           <p className="text-xs uppercase tracking-wide mb-1.5" style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--muted)" }}>confidence</p>
-          <div className="flex gap-1.5">
+          <div className="flex gap-1.5" data-tour="cm-confidence">
             {[1, 2, 3, 4, 5].map((n) => (
               <button key={n} onClick={() => set({ confidence: n })} className="w-8 h-8 rounded-full text-xs font-semibold" style={{
                 fontFamily: "JetBrains Mono, monospace",
@@ -3027,7 +3045,7 @@ function ChapterModal({ chapter, subject, data, onChange, onClose, chapterPlans,
 
         <div className="mb-4">
           <p className="text-xs uppercase tracking-wide mb-1.5" style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--muted)" }}>exam weight</p>
-          <div className="flex gap-1.5">
+          <div className="flex gap-1.5" data-tour="cm-weight">
             {WEIGHT_OPTS.map(([v, label]) => (
               <button key={v} onClick={() => set({ weight: v })} className="flex-1 text-xs rounded px-2 py-1.5" style={{
                 fontFamily: "JetBrains Mono, monospace",
@@ -3039,12 +3057,14 @@ function ChapterModal({ chapter, subject, data, onChange, onClose, chapterPlans,
           </div>
         </div>
 
-        <div>
+        <div data-tour="cm-formula">
           <p className="text-xs uppercase tracking-wide mb-1.5" style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--muted)" }}>key formula (feeds Formula Sheet once mastered)</p>
           <textarea value={data.formula} onChange={(e) => set({ formula: e.target.value })} rows={2} placeholder="e.g. v = u + at"
             className="w-full text-sm rounded border p-2 tk-field" style={{ borderColor: "var(--border)", fontFamily: "JetBrains Mono, monospace" }} />
         </div>
       </div>
+
+      <TourGuide tourId="chapter-modal" steps={CHAPTER_MODAL_TOUR_STEPS} active={openChapterTour.active} onDone={openChapterTour.stop} />
     </div>
   );
 }
@@ -3349,6 +3369,17 @@ function StudyReportModal({ subjectsData, track, calendarData, dark, userName, u
   );
 }
 
+const CHAPTERS_TOUR_STEPS = [
+  { target: null, title: "Study ট্যাবে স্বাগতম 📘", body: "এখানেই তোমার পুরো সিলেবাসের প্রতিটা চ্যাপ্টার ট্র্যাক করবে — কোনটা শেষ, কোনটা দুর্বল, কোনটায় ফোকাস দরকার। কয়েকটা ধাপে দেখিয়ে দিচ্ছি।" },
+  { target: "[data-tour='ch-track']", title: "ট্র্যাক বাছাই", body: "Engineering/Medical/Varsity/IBA — যেটাতে ট্যাপ করবে, নিচের পুরো চ্যাপ্টার লিস্ট আর সাবজেক্ট সেই ট্র্যাক অনুযায়ী বদলে যাবে।" },
+  { target: "[data-tour='ch-daily-focus']", title: "Study daily প্যানেল", body: "চ্যাপ্টার ডিটেইলে গিয়ে যেগুলো 'daily focus' করে রাখবে, সেগুলো এখানে রোজ দেখাবে। টিক দিলে streak (ধারাবাহিকতা) কাউন্ট হয় — ধারাবাহিক রিভিশনের জন্য দারুণ কাজে দেয়।" },
+  { target: "[data-tour='ch-stats']", title: "কুইক স্ট্যাটস", body: "কতগুলো চ্যাপ্টার মাস্টার হয়েছে, মোট আসল পড়ার ঘণ্টা (activity log থেকে হিসাব করা), কয়টা চ্যাপ্টারে দুর্বলতার ফ্ল্যাগ আছে (low confidence + in progress), আর মোট চ্যাপ্টার সংখ্যা — সব এক নজরে।" },
+  { target: "[data-tour='ch-subjects']", title: "সাবজেক্ট সিলেক্টর", body: "কোন সাবজেক্টের চ্যাপ্টার দেখবে সেটা এখান থেকে বাছাই করো — নিচের গ্রিড সাথে সাথে বদলে যাবে।" },
+  { target: "[data-tour='ch-report']", title: "Report", body: "এই বাটনে চাপলে পুরো সাবজেক্টের একটা সামারি রিপোর্ট তৈরি হয় — কোন চ্যাপ্টার কতটা এগিয়েছে, কোথায় দুর্বলতা, ইত্যাদির একটা ঝটপট ওভারভিউ।" },
+  { target: "[data-tour='ch-snapshot']", title: "Subject snapshot (ছবি হিসেবে সেভ)", body: "এটা চাপলে বর্তমান সাবজেক্টের প্রোগ্রেসের একটা PNG ছবি ডাউনলোড হয়ে যাবে — বন্ধুদের শেয়ার করতে বা নিজের কাছে রেকর্ড রাখতে কাজে লাগবে।" },
+  { target: "[data-tour='ch-grid']", title: "চ্যাপ্টার গ্রিড", body: "প্রতিটা কার্ডে ট্যাপ করলে সেই চ্যাপ্টারের ডিটেইল স্ক্রিন খোলে (status, activity log, confidence, weight, formula — সব ওখানে)। রঙিন ডট = status, উপরের ব্যাজ = exam weight, 🔥 আইকন = daily focus চ্যাপ্টার, আর হলুদ রিমাইন্ডার আইকন মানে revision due।" },
+];
+
 function ChaptersTab({ subjectsData, setChapterData, track, setTrack, dark, calendarData, addChapterPlan, removeChapterPlan, pendingOpen, clearPendingOpen, dailyChecks, setDailyChecks, userName, userPhoto, bgImage }) {
   const visibleSubjects = SUBJECTS.filter((s) => TRACKS.find((t) => t.id === track).subjects.includes(s.id));
   const [subjectId, setSubjectId] = useState(visibleSubjects[0].id);
@@ -3385,27 +3416,38 @@ function ChaptersTab({ subjectsData, setChapterData, track, setTrack, dark, cale
   const openChapter = openChapterId ? subject.chapters.find((c) => c.id === openChapterId) : null;
   const openData = openChapterId ? chapters?.[openChapterId] : null;
 
+  const tour = useTabTour("study");
+
   return (
     <div>
-      <div className="flex gap-1 flex-wrap mb-3">
-        {TRACKS.map((t) => (
-          <button key={t.id} onClick={() => setTrack(t.id)}
-            className="px-3 py-1 rounded text-xs font-semibold"
-            style={{
-              fontFamily: "JetBrains Mono, monospace",
-              background: track === t.id ? "var(--ink-strong)" : "var(--surface)",
-              color: track === t.id ? "var(--on-ink)" : "var(--muted)",
-              border: `1px solid ${track === t.id ? "var(--ink-strong)" : "var(--border)"}`,
-            }}>
-            {t.label}
-          </button>
-        ))}
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <div className="flex gap-1 flex-wrap" data-tour="ch-track">
+          {TRACKS.map((t) => (
+            <button key={t.id} onClick={() => setTrack(t.id)}
+              className="px-3 py-1 rounded text-xs font-semibold"
+              style={{
+                fontFamily: "JetBrains Mono, monospace",
+                background: track === t.id ? "var(--ink-strong)" : "var(--surface)",
+                color: track === t.id ? "var(--on-ink)" : "var(--muted)",
+                border: `1px solid ${track === t.id ? "var(--ink-strong)" : "var(--border)"}`,
+              }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <button onClick={tour.replay} className="text-xs font-semibold px-2 py-1 rounded flex-shrink-0 flex items-center gap-1"
+          style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--accent)", border: "1px solid var(--border)", background: "var(--surface)" }}
+          title="Replay the Study guide">
+          <HelpCircle size={12} /> guide
+        </button>
       </div>
 
-      <DailyFocusPanel subjectsData={subjectsData} track={track} dailyChecks={dailyChecks} setDailyChecks={setDailyChecks}
-        onOpenChapter={(sid, cid) => { setSubjectId(sid); setOpenChapterId(cid); }} />
+      <div data-tour="ch-daily-focus">
+        <DailyFocusPanel subjectsData={subjectsData} track={track} dailyChecks={dailyChecks} setDailyChecks={setDailyChecks}
+          onOpenChapter={(sid, cid) => { setSubjectId(sid); setOpenChapterId(cid); }} />
+      </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4" data-tour="ch-stats">
         {[
           ["Mastered", `${mastered}/${trackChapterData.length}`],
           ["Actual hrs", actualTotal.toFixed(1).replace(/\.0$/, "")],
@@ -3420,7 +3462,7 @@ function ChaptersTab({ subjectsData, setChapterData, track, setTrack, dark, cale
       </div>
 
       <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
-        <div className="flex gap-1 flex-wrap">
+        <div className="flex gap-1 flex-wrap" data-tour="ch-subjects">
           {visibleSubjects.map((s) => (
             <button key={s.id} onClick={() => { setSubjectId(s.id); setOpenChapterId(null); }}
               className="px-3 py-1.5 rounded-full text-xs font-semibold"
@@ -3437,12 +3479,14 @@ function ChaptersTab({ subjectsData, setChapterData, track, setTrack, dark, cale
         <div className="flex gap-1.5 flex-wrap">
           <button
             onClick={() => setReportOpen(true)}
+            data-tour="ch-report"
             className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full"
             style={{ background: "var(--surface)", color: "var(--ink-soft)", border: "1px solid var(--border)" }}>
             <ClipboardList size={13} /> report
           </button>
           <button
             onClick={() => downloadSnapshot(buildSubjectSnapshotPayload(subject, chapters), dark)}
+            data-tour="ch-snapshot"
             className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full"
             style={{ background: "var(--surface)", color: "var(--ink-soft)", border: "1px solid var(--border)" }}>
             <Camera size={13} /> subject snapshot
@@ -3454,7 +3498,7 @@ function ChaptersTab({ subjectsData, setChapterData, track, setTrack, dark, cale
         <StudyReportModal subjectsData={subjectsData} track={track} calendarData={calendarData} dark={dark} userName={userName} userPhoto={userPhoto} bgImage={bgImage} onClose={() => setReportOpen(false)} />
       )}
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3" data-tour="ch-grid">
         {subject.chapters.map((ch, idx) => {
           const data = chapters?.[ch.id];
           if (!data) return null;
@@ -3477,6 +3521,8 @@ function ChaptersTab({ subjectsData, setChapterData, track, setTrack, dark, cale
           removeChapterPlan={removeChapterPlan}
         />
       )}
+
+      <TourGuide tourId="study" steps={CHAPTERS_TOUR_STEPS} active={tour.active && !reportOpen && !openChapterId} onDone={tour.stop} />
     </div>
   );
 }
