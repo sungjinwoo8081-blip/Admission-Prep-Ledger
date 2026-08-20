@@ -538,6 +538,26 @@
         if (error) throw error;
       },
 
+      // Blocking — prevents messaging in both directions once blocked (enforced by
+      // the RLS policy from supabase-chat-social.sql; this list also drives the
+      // client-side "who can I message / search" filtering).
+      async fetchBlockedUsers() {
+        if (!sb || !currentUserId) return [];
+        const { data, error } = await sb.from("blocked_users").select("blocked_id").eq("blocker_id", currentUserId);
+        if (error || !data) return [];
+        return data.map((r) => r.blocked_id);
+      },
+
+      async blockUser(userId) {
+        if (!sb || !currentUserId) return;
+        try { await sb.from("blocked_users").insert({ blocker_id: currentUserId, blocked_id: userId }); } catch (e) {}
+      },
+
+      async unblockUser(userId) {
+        if (!sb || !currentUserId) return;
+        try { await sb.from("blocked_users").delete().eq("blocker_id", currentUserId).eq("blocked_id", userId); } catch (e) {}
+      },
+
       async markRead(conversationKey) {
         if (!sb || !currentUserId) return;
         try {
@@ -7764,7 +7784,7 @@ const THEME_IDS = THEMES.map((t) => t.id);
 // Shared "tap a name → see their overview" profile card. Works from the
 // leaderboard, chat friends/directory lists, and study-buddy suggestions —
 // anywhere a person's name appears, this shows their public progress snapshot.
-function ProfileModal({ profile, isMe, isFriend, requestSent, onClose, onMessage, onAddFriend }) {
+function ProfileModal({ profile, isMe, isFriend, requestSent, isBlocked, onClose, onMessage, onAddFriend, onToggleBlock }) {
   if (!profile) return null;
   return (
     <ModalShell title="প্রোফাইল" subtitle={profile.name || "Anonymous"} onClose={onClose}>
@@ -7816,22 +7836,28 @@ function ProfileModal({ profile, isMe, isFriend, requestSent, onClose, onMessage
 
       {!isMe && (onMessage || onAddFriend) && (
         <div className="flex gap-2">
-          {onMessage && (
+          {onMessage && !isBlocked && (
             <button onClick={onMessage} className="flex-1 text-sm font-semibold px-3 py-2 rounded-lg" style={{ background: "var(--accent)", color: "#fff" }}>
               মেসেজ পাঠান
             </button>
           )}
-          {onAddFriend && !isFriend && (
+          {onAddFriend && !isFriend && !isBlocked && (
             <button onClick={onAddFriend} disabled={requestSent}
               className="flex-1 text-sm font-semibold px-3 py-2 rounded-lg"
               style={{ border: "1px solid var(--border)", color: "var(--ink)", opacity: requestSent ? 0.6 : 1 }}>
               {requestSent ? "অনুরোধ পাঠানো হয়েছে" : "+ বন্ধু"}
             </button>
           )}
-          {isFriend && !onMessage && (
+          {isFriend && !isBlocked && (
             <span className="flex-1 text-sm text-center px-3 py-2" style={{ color: "var(--muted)" }}>ইতিমধ্যে বন্ধু</span>
           )}
         </div>
+      )}
+      {!isMe && onToggleBlock && (
+        <button onClick={onToggleBlock} className="w-full text-xs font-semibold px-3 py-2 rounded-lg mt-2"
+          style={{ border: "1px solid var(--border)", color: isBlocked ? "var(--accent)" : "#A5473A" }}>
+          {isBlocked ? "আনব্লক করুন" : "🚫 ব্লক করুন"}
+        </button>
       )}
     </ModalShell>
   );
@@ -7845,6 +7871,7 @@ function CommunityTab({ dark, userName, userPhoto, track }) {
   const [friendMap, setFriendMap] = useState({});
   const [requestSentIds, setRequestSentIds] = useState([]);
   const [jumpToUserId, setJumpToUserId] = useState(null);
+  const [blockedIds, setBlockedIds] = useState([]);
   const cs = window.cloudSync;
   const myId = cs && cs.getUserId ? cs.getUserId() : null;
 
@@ -7853,12 +7880,14 @@ function CommunityTab({ dark, userName, userPhoto, track }) {
   const refresh = useCallback(async () => {
     if (!window.cloudSync || !window.cloudSync.enabled) return;
     try {
-      const [data, fm] = await Promise.all([
+      const [data, fm, blocked] = await Promise.all([
         window.cloudSync.fetchLeaderboard(),
         window.cloudSync.fetchFriendStatusMap(),
+        window.cloudSync.fetchBlockedUsers(),
       ]);
       setRows(data);
       setFriendMap(fm);
+      setBlockedIds(blocked);
     } catch (e) {
       setError("লিডারবোর্ড লোড করা যায়নি।");
     }
@@ -7871,6 +7900,16 @@ function CommunityTab({ dark, userName, userPhoto, track }) {
       await cs.sendFriendRequest(userId);
       setRequestSentIds((prev) => [...prev, userId]);
     } catch (e) {}
+  }
+
+  async function toggleBlock(userId) {
+    if (blockedIds.includes(userId)) {
+      await cs.unblockUser(userId);
+      setBlockedIds((prev) => prev.filter((id) => id !== userId));
+    } else {
+      await cs.blockUser(userId);
+      setBlockedIds((prev) => [...prev, userId]);
+    }
   }
 
   function messageUser(userId) {
@@ -7896,7 +7935,7 @@ function CommunityTab({ dark, userName, userPhoto, track }) {
   // Study buddy — same track, closest overall progress to yours (so it's a fair match, not a leader vs. beginner).
   let buddy = null;
   if (myRow) {
-    const candidates = allRows.filter((r) => r.user_id !== myId && r.track === myRow.track);
+    const candidates = allRows.filter((r) => r.user_id !== myId && r.track === myRow.track && !blockedIds.includes(r.user_id));
     let bestDiff = Infinity;
     candidates.forEach((r) => {
       const diff = Math.abs((r.overall_progress || 0) - (myRow.overall_progress || 0));
@@ -8071,9 +8110,11 @@ function CommunityTab({ dark, userName, userPhoto, track }) {
           isMe={profileUser.user_id === myId}
           isFriend={friendMap[profileUser.user_id]?.state === "friends"}
           requestSent={requestSentIds.includes(profileUser.user_id) || friendMap[profileUser.user_id]?.state === "pending_sent"}
+          isBlocked={blockedIds.includes(profileUser.user_id)}
           onClose={() => setProfileUser(null)}
           onMessage={() => messageUser(profileUser.user_id)}
           onAddFriend={() => addFriend(profileUser.user_id)}
+          onToggleBlock={() => toggleBlock(profileUser.user_id)}
         />
       )}
     </div>
@@ -8100,6 +8141,8 @@ function ChatHub({ dark, userName, userPhoto, myTrack, jumpToUserId, onJumpHandl
   const [mobileThreadOpen, setMobileThreadOpen] = useState(false);
   const [active, setActive] = useState({ type: "group", groupId: COMMUNITY_GROUP_ID, name: "Community" });
   const [onlineIds, setOnlineIds] = useState([]);
+  const [blockedIds, setBlockedIds] = useState([]);
+  const [showBlocked, setShowBlocked] = useState(false);
 
   // Presence — a small green dot next to whoever is online right now.
   useEffect(() => {
@@ -8124,14 +8167,15 @@ function ChatHub({ dark, userName, userPhoto, myTrack, jumpToUserId, onJumpHandl
   }
 
   const loadSidebar = useCallback(async () => {
-    const [dir, gs, fm, inc, rs] = await Promise.all([
-      cs.fetchDirectory(), cs.fetchMyGroups(), cs.fetchFriendStatusMap(), cs.fetchFriendRequestsIncoming(), cs.fetchReadState(),
+    const [dir, gs, fm, inc, rs, blocked] = await Promise.all([
+      cs.fetchDirectory(), cs.fetchMyGroups(), cs.fetchFriendStatusMap(), cs.fetchFriendRequestsIncoming(), cs.fetchReadState(), cs.fetchBlockedUsers(),
     ]);
     setDirectory(dir);
     setGroups(gs);
     setFriendMap(fm);
     setIncomingRequests(inc);
     setReadState(rs);
+    setBlockedIds(blocked);
     const act = await cs.fetchRecentActivity(gs.map((g) => g.id));
     setActivity(act);
   }, []);
@@ -8188,12 +8232,27 @@ function ChatHub({ dark, userName, userPhoto, myTrack, jumpToUserId, onJumpHandl
   const friendIds = Object.keys(friendMap).filter((uid) => friendMap[uid].state === "friends");
   const filteredDirectory = directory.filter((d) => {
     if (!d.user_id || d.user_id === myId) return false;
+    if (blockedIds.includes(d.user_id)) return false;
     if (!search.trim()) return true;
     return (d.name || "").toLowerCase().includes(search.trim().toLowerCase());
   });
   const suggestedFriends = myTrack
-    ? directory.filter((d) => d.user_id && d.user_id !== myId && d.track === myTrack && !friendMap[d.user_id]).slice(0, 5)
+    ? directory.filter((d) => d.user_id && d.user_id !== myId && d.track === myTrack && !friendMap[d.user_id] && !blockedIds.includes(d.user_id)).slice(0, 5)
     : [];
+
+  async function toggleBlock(userId) {
+    if (blockedIds.includes(userId)) {
+      await cs.unblockUser(userId);
+      setBlockedIds((prev) => prev.filter((id) => id !== userId));
+    } else {
+      await cs.blockUser(userId);
+      setBlockedIds((prev) => [...prev, userId]);
+      // if you're currently viewing this person's DM, back out to Community
+      if (active.type === "dm" && active.recipientId === userId) {
+        openConversation({ type: "group", groupId: COMMUNITY_GROUP_ID, name: "Community" });
+      }
+    }
+  }
 
   // Shared glass-glow style for the active conversation in the sidebar list.
   function navItemStyle(isActive) {
@@ -8243,10 +8302,17 @@ function ChatHub({ dark, userName, userPhoto, myTrack, jumpToUserId, onJumpHandl
           )}
         </button>
 
-        {friendIds.length > 0 && (
+        <button onClick={() => setShowBlocked(true)} className="w-full text-left text-xs px-3 py-2 rounded-lg flex items-center justify-between" style={{ color: dark ? "#ddd" : "#333" }}>
+          <span>ব্লক করা ব্যবহারকারী</span>
+          {blockedIds.length > 0 && (
+            <span className="text-[10px] px-1.5 rounded-full" style={{ border: "1px solid var(--border)", color: "var(--muted)" }}>{blockedIds.length}</span>
+          )}
+        </button>
+
+        {friendIds.filter((uid) => !blockedIds.includes(uid)).length > 0 && (
           <div className="pt-2 mt-2" style={{ borderTop: "1px solid var(--border)" }}>
             <p className="text-xs px-3 mb-1" style={{ color: dark ? "#888" : "#999" }}>বন্ধুরা</p>
-            {friendIds.map((uid) => {
+            {friendIds.filter((uid) => !blockedIds.includes(uid)).map((uid) => {
               const p = directory.find((d) => d.user_id === uid);
               const key = convKeyForDM(myId, uid);
               return (
@@ -8323,6 +8389,11 @@ function ChatHub({ dark, userName, userPhoto, myTrack, jumpToUserId, onJumpHandl
           onBack={() => setMobileThreadOpen(false)}
           onLeftGroup={() => { loadSidebar(); openConversation({ type: "group", groupId: COMMUNITY_GROUP_ID, name: "Community" }); }}
           onOpenProfile={openProfile}
+          isFriend={active.type === "dm" ? friendMap[active.recipientId]?.state === "friends" : true}
+          friendState={active.type === "dm" ? (friendMap[active.recipientId]?.state || null) : null}
+          onSendFriendRequest={active.type === "dm" ? async () => { await cs.sendFriendRequest(active.recipientId); loadSidebar(); } : null}
+          isBlocked={active.type === "dm" ? blockedIds.includes(active.recipientId) : false}
+          onToggleBlock={active.type === "dm" ? () => toggleBlock(active.recipientId) : null}
         />
       </div>
 
@@ -8364,13 +8435,34 @@ function ChatHub({ dark, userName, userPhoto, myTrack, jumpToUserId, onJumpHandl
           )}
         </ModalShell>
       )}
+
+      {showBlocked && (
+        <ModalShell title="ব্লক করা ব্যবহারকারী" subtitle="এদের কাছ থেকে/এদের কাছে মেসেজ যাবে না" onClose={() => setShowBlocked(false)}>
+          {blockedIds.length === 0 ? (
+            <p className="text-sm" style={{ color: "var(--muted)" }}>আপনি কাউকে ব্লক করেননি।</p>
+          ) : (
+            <div className="space-y-2">
+              {blockedIds.map((uid) => {
+                const p = directory.find((d) => d.user_id === uid);
+                return (
+                  <div key={uid} className="flex items-center justify-between text-sm px-2 py-2 rounded" style={{ border: "1px solid var(--border)" }}>
+                    <span>{p?.name || "Anonymous"}</span>
+                    <button onClick={() => toggleBlock(uid)}
+                      className="text-xs px-2 py-1 rounded" style={{ background: "var(--accent)", color: "#fff" }}>আনব্লক</button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </ModalShell>
+      )}
     </div>
   );
 }
 
 const REACTION_EMOJIS = ["👍", "🔥", "❤️"];
 
-function ChatThread({ dark, userName, userPhoto, active, directory, myId: myIdProp, onBack, onLeftGroup, onOpenProfile }) {
+function ChatThread({ dark, userName, userPhoto, active, directory, myId: myIdProp, onBack, onLeftGroup, onOpenProfile, isFriend, friendState, onSendFriendRequest, isBlocked, onToggleBlock }) {
   const cs = window.cloudSync;
   const [messages, setMessages] = useState(null);
   const [reactions, setReactions] = useState({});
@@ -8516,6 +8608,11 @@ function ChatThread({ dark, userName, userPhoto, active, directory, myId: myIdPr
               👥 মেম্বার
             </button>
           )}
+          {active.type === "dm" && onToggleBlock && (
+            <button onClick={onToggleBlock} className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ border: "1px solid var(--border)", color: isBlocked ? "var(--accent)" : "var(--muted)" }}>
+              {isBlocked ? "আনব্লক" : "🚫 ব্লক"}
+            </button>
+          )}
           <span className="text-[10px]" style={{ color: "var(--faint)" }}>৭২ ঘণ্টা পর মুছে যায়</span>
         </div>
       </div>
@@ -8590,29 +8687,53 @@ function ChatThread({ dark, userName, userPhoto, active, directory, myId: myIdPr
         )}
       </div>
       {error && <p className="text-xs px-3 pt-1" style={{ color: "#e2725b" }}>{error}</p>}
-      <form onSubmit={submit} className="flex items-center gap-2 p-2" style={{
-        borderTop: "1px solid var(--border)", background: "linear-gradient(0deg, var(--panel), var(--surface))",
-        backdropFilter: "blur(18px) saturate(140%)", WebkitBackdropFilter: "blur(18px) saturate(140%)",
-      }}>
-        <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePickImage} style={{ display: "none" }} />
-        <button type="button" onClick={() => fileInputRef.current && fileInputRef.current.click()}
-          disabled={imageUploading} title="ছবি পাঠান"
-          className="flex-shrink-0 flex items-center justify-center rounded-full"
-          style={{ width: 36, height: 36, border: "1px solid var(--border)", color: "var(--muted)", opacity: imageUploading ? 0.5 : 1 }}>
-          {imageUploading ? "…" : "📷"}
-        </button>
-        <input
-          type="text" value={draft} onChange={(e) => setDraft(e.target.value)}
-          placeholder="একটা মেসেজ লিখুন…" maxLength={500}
-          className="flex-1 text-sm px-3 py-2 rounded-full tk-field"
-          style={{ border: "1px solid var(--border)" }}
-        />
-        <button type="submit" disabled={sending || !draft.trim()}
-          className="text-sm font-semibold px-4 py-2 rounded-full flex-shrink-0"
-          style={{ background: "var(--accent)", color: "#fff", opacity: sending || !draft.trim() ? 0.6 : 1 }}>
-          পাঠান
-        </button>
-      </form>
+      {active.type === "dm" && isBlocked ? (
+        <div className="flex items-center justify-between gap-2 p-3" style={{
+          borderTop: "1px solid var(--border)", background: "var(--panel)",
+        }}>
+          <span className="text-xs" style={{ color: "var(--muted)" }}>আপনি এই ব্যবহারকারীকে ব্লক করেছেন — মেসেজ পাঠানো/পাওয়া বন্ধ আছে।</span>
+          {onToggleBlock && (
+            <button onClick={onToggleBlock} className="text-xs font-semibold px-3 py-1.5 rounded-full flex-shrink-0" style={{ background: "var(--accent)", color: "#fff" }}>আনব্লক</button>
+          )}
+        </div>
+      ) : active.type === "dm" && !isFriend ? (
+        <div className="flex items-center justify-between gap-2 p-3" style={{
+          borderTop: "1px solid var(--border)", background: "var(--panel)",
+        }}>
+          <span className="text-xs" style={{ color: "var(--muted)" }}>
+            {friendState === "pending_sent" ? "বন্ধু অনুরোধ পাঠানো হয়েছে — গ্রহণ করলে মেসেজ পাঠাতে পারবেন।"
+              : friendState === "pending_received" ? "এই ব্যবহারকারী আপনাকে বন্ধু অনুরোধ পাঠিয়েছে — 'বন্ধুর অনুরোধ' থেকে গ্রহণ করুন।"
+              : "শুধু বন্ধুদের সাথেই মেসেজ পাঠানো যায় — আগে বন্ধু অনুরোধ পাঠান।"}
+          </span>
+          {friendState !== "pending_sent" && friendState !== "pending_received" && onSendFriendRequest && (
+            <button onClick={onSendFriendRequest} className="text-xs font-semibold px-3 py-1.5 rounded-full flex-shrink-0" style={{ background: "var(--accent)", color: "#fff" }}>+ বন্ধু</button>
+          )}
+        </div>
+      ) : (
+        <form onSubmit={submit} className="flex items-center gap-2 p-2" style={{
+          borderTop: "1px solid var(--border)", background: "linear-gradient(0deg, var(--panel), var(--surface))",
+          backdropFilter: "blur(18px) saturate(140%)", WebkitBackdropFilter: "blur(18px) saturate(140%)",
+        }}>
+          <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePickImage} style={{ display: "none" }} />
+          <button type="button" onClick={() => fileInputRef.current && fileInputRef.current.click()}
+            disabled={imageUploading} title="ছবি পাঠান"
+            className="flex-shrink-0 flex items-center justify-center rounded-full"
+            style={{ width: 36, height: 36, border: "1px solid var(--border)", color: "var(--muted)", opacity: imageUploading ? 0.5 : 1 }}>
+            {imageUploading ? "…" : "📷"}
+          </button>
+          <input
+            type="text" value={draft} onChange={(e) => setDraft(e.target.value)}
+            placeholder="একটা মেসেজ লিখুন…" maxLength={500}
+            className="flex-1 text-sm px-3 py-2 rounded-full tk-field"
+            style={{ border: "1px solid var(--border)" }}
+          />
+          <button type="submit" disabled={sending || !draft.trim()}
+            className="text-sm font-semibold px-4 py-2 rounded-full flex-shrink-0"
+            style={{ background: "var(--accent)", color: "#fff", opacity: sending || !draft.trim() ? 0.6 : 1 }}>
+            পাঠান
+          </button>
+        </form>
+      )}
 
       {showMembers && (
         <ModalShell title="গ্রুপ" subtitle={active.name} onClose={() => setShowMembers(false)}>
