@@ -138,6 +138,102 @@
   #app-splash.app-splash-error .app-splash-retry { display: inline-block; }
   .app-splash-retry:hover { background: rgba(229,72,77,0.22); }
 
+  /* ================= Auth screen — glassmorphic sign-in / sign-up ================= */
+  .auth-wrap {
+    position: fixed; inset: 0; min-height: 100dvh; z-index: 1;
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px; overflow: hidden; box-sizing: border-box;
+    background:
+      radial-gradient(ellipse 900px 700px at 15% 10%, rgba(232,121,47,0.16), transparent 60%),
+      radial-gradient(ellipse 800px 700px at 88% 88%, rgba(232,121,47,0.10), transparent 55%),
+      #0C0A08;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+  }
+  .auth-blob {
+    position: absolute; border-radius: 50%; filter: blur(60px); pointer-events: none;
+    background: radial-gradient(circle, rgba(232,121,47,0.5), rgba(232,121,47,0) 70%);
+    animation: app-splash-drift 10s ease-in-out infinite; will-change: transform;
+  }
+  .auth-blob.a1 { width: 360px; height: 360px; top: -100px; left: -80px; }
+  .auth-blob.a2 { width: 280px; height: 280px; bottom: -80px; right: -60px; animation-delay: 2.4s;
+    background: radial-gradient(circle, rgba(255,150,80,0.38), rgba(255,150,80,0) 70%); }
+  .auth-blob.a3 { width: 220px; height: 220px; bottom: 22%; left: 6%; animation-delay: 4.8s;
+    background: radial-gradient(circle, rgba(232,80,47,0.28), rgba(232,80,47,0) 70%); }
+
+  .auth-card {
+    position: relative; z-index: 1; width: 100%; max-width: 380px;
+    padding: 34px 30px 28px; border-radius: 24px; box-sizing: border-box;
+    background: rgba(255,255,255,0.055); border: 1px solid rgba(232,121,47,0.18);
+    backdrop-filter: blur(24px) saturate(150%); -webkit-backdrop-filter: blur(24px) saturate(150%);
+    box-shadow: 0 30px 80px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.02) inset;
+    animation: auth-card-in 0.6s cubic-bezier(0.4,0,0.2,1);
+  }
+  @keyframes auth-card-in { from { opacity: 0; transform: translateY(18px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+  .auth-logo-wrap { position: relative; width: 60px; height: 60px; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; }
+  .auth-logo-ring { position: absolute; inset: -13px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(232,121,47,0.45), rgba(232,121,47,0) 68%);
+    animation: app-splash-pulse 1.8s ease-in-out infinite; }
+  .auth-logo { position: relative; width: 100%; height: 100%; border-radius: 15px; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(145deg, #F0954C, #E8792F); box-shadow: 0 8px 22px rgba(232,121,47,0.4); }
+  .auth-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  .auth-title { margin: 0 0 4px; font-size: 19px; font-weight: 700; text-align: center; letter-spacing: -0.01em;
+    background: linear-gradient(90deg, #FBEEDC, #F0AE72, #FBEEDC); background-size: 220% auto;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: app-splash-shimmer 3.4s linear infinite; }
+  .auth-subtitle { margin: 0 0 22px; font-size: 10.5px; letter-spacing: 0.09em; text-transform: uppercase;
+    text-align: center; color: rgba(224,174,114,0.55); font-family: "JetBrains Mono", monospace; }
+
+  .auth-tabs { display: flex; position: relative; background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08); border-radius: 999px; padding: 4px; margin-bottom: 20px; }
+  .auth-tab-highlight { position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc(50% - 4px);
+    border-radius: 999px; background: linear-gradient(135deg, #F0954C, #E8792F);
+    box-shadow: 0 4px 14px rgba(232,121,47,0.4); transition: transform 0.32s cubic-bezier(0.4,0,0.2,1); z-index: 0; }
+  .auth-tab { flex: 1; position: relative; z-index: 1; text-align: center; padding: 9px 0; cursor: pointer;
+    font-size: 12.5px; font-weight: 600; border-radius: 999px; color: rgba(255,255,255,0.55);
+    transition: color 0.3s ease; user-select: none; }
+  .auth-tab.active { color: #1a1207; }
+
+  .auth-field { position: relative; margin-bottom: 12px; }
+  .auth-field-icon { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); opacity: 0.45; pointer-events: none; }
+  .auth-input { width: 100%; box-sizing: border-box; padding: 12px 40px 12px 38px; border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); color: #FBEEDC;
+    font-size: 15px; font-family: Inter, sans-serif; transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease; }
+  .auth-input::placeholder { color: rgba(224,174,114,0.35); }
+  .auth-input:focus { outline: none; border-color: rgba(232,121,47,0.55); background: rgba(232,121,47,0.05);
+    box-shadow: 0 0 0 3px rgba(232,121,47,0.14); }
+  .auth-eye-btn { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none;
+    cursor: pointer; padding: 7px; color: rgba(255,255,255,0.4); display: flex; align-items: center; justify-content: center; }
+  .auth-eye-btn:hover { color: rgba(255,255,255,0.75); }
+
+  .auth-msg { display: flex; align-items: flex-start; gap: 8px; padding: 9px 12px; border-radius: 10px;
+    font-size: 12px; line-height: 1.45; margin-bottom: 12px; font-family: Inter, sans-serif; animation: auth-msg-in 0.25s ease; }
+  @keyframes auth-msg-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+  .auth-msg-error { background: rgba(229,72,77,0.12); border: 1px solid rgba(229,72,77,0.3); color: #F3908F; }
+  .auth-msg-notice { background: rgba(75,190,130,0.12); border: 1px solid rgba(75,190,130,0.3); color: #8FE0AC; }
+
+  .auth-submit { width: 100%; min-height: 46px; padding: 12px 0; border-radius: 12px; border: none;
+    background: linear-gradient(135deg, #F0954C, #E8792F); color: #1a1207; font-weight: 700; font-size: 14px;
+    font-family: Inter, sans-serif; cursor: pointer; margin-top: 6px; box-shadow: 0 10px 26px rgba(232,121,47,0.32);
+    transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+    display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .auth-submit:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 14px 32px rgba(232,121,47,0.42); }
+  .auth-submit:active:not(:disabled) { transform: translateY(0); }
+  .auth-submit:disabled { opacity: 0.65; cursor: default; }
+
+  .auth-spinner { width: 15px; height: 15px; border-radius: 50%; border: 2px solid rgba(26,18,7,0.3);
+    border-top-color: #1a1207; animation: app-splash-spin 0.7s linear infinite; }
+
+  .auth-switch { text-align: center; margin-top: 18px; font-size: 12px; color: rgba(224,174,114,0.55); font-family: Inter, sans-serif; }
+  .auth-switch b { color: #F0AE72; cursor: pointer; font-weight: 700; }
+  .auth-switch b:hover { text-decoration: underline; }
+
+  @media (max-width: 420px) {
+    .auth-card { padding: 28px 22px 24px; border-radius: 20px; }
+  }
+
   #boot-msg { font-family: sans-serif; color: #ccc; padding: 24px; }
 </style>
 </head>
@@ -536,26 +632,6 @@
         if (!sb) return;
         const { error } = await sb.from("friend_requests").update({ status: accept ? "accepted" : "declined" }).eq("id", requestId);
         if (error) throw error;
-      },
-
-      // Blocking — prevents messaging in both directions once blocked (enforced by
-      // the RLS policy from supabase-chat-social.sql; this list also drives the
-      // client-side "who can I message / search" filtering).
-      async fetchBlockedUsers() {
-        if (!sb || !currentUserId) return [];
-        const { data, error } = await sb.from("blocked_users").select("blocked_id").eq("blocker_id", currentUserId);
-        if (error || !data) return [];
-        return data.map((r) => r.blocked_id);
-      },
-
-      async blockUser(userId) {
-        if (!sb || !currentUserId) return;
-        try { await sb.from("blocked_users").insert({ blocker_id: currentUserId, blocked_id: userId }); } catch (e) {}
-      },
-
-      async unblockUser(userId) {
-        if (!sb || !currentUserId) return;
-        try { await sb.from("blocked_users").delete().eq("blocker_id", currentUserId).eq("blocked_id", userId); } catch (e) {}
       },
 
       async markRead(conversationKey) {
@@ -5288,7 +5364,7 @@ function SyllabusSubjectBlock({ subject, selectedIds, onToggleChapter, onToggleA
 /* SECTION (a) — plan an exam: name, date, track, exam type, total marks, syllabus.
    No marks are entered here; that happens afterward in the results panel. */
 const EXAM_PLAN_TOUR_STEPS = [
-  { target: null, title: "Plan Exam", body: "আসন্ন যেকোনো পরীক্ষা (weekly, model test, board exam) এখানে প্ল্যান করে রাখো — নাম, তারিখ, ট্র্যাক, টাইপ, মোট মার্ক আর কোন কোন চ্যাপ্টার থেকে আসবে। মার্ক পরে 'Marks & Trend' থেকে বসাবে।" },
+  { target: null, title: "Plan Exam", body: "আসন্ন যেকোনো পরীক্ষা (weekly, model test, board exam) এখানে প্ল্যান করে রাখো — নাম, তারিখ, ট্র্যাক, টাইপ, মোট মার্ক আর কোন কোন চ্যাপ্টার থেকে আসবে। মার্ক পরে 'Marks' ট্যাব থেকে বসাবে।" },
   { target: "[data-tour='ep-form']", title: "পরীক্ষার তথ্য", body: "নাম আর তারিখ দাও, কোন ট্র্যাকের (Engineering/Medical/Varsity/IBA) আর কী ধরনের (weekly/model ইত্যাদি) পরীক্ষা সেটা বেছে নাও, আর মোট মার্ক বসাও।" },
   { target: "[data-tour='ep-syllabus']", title: "সিলেবাস বাছাই", body: "কোন কোন চ্যাপ্টার থেকে পরীক্ষাটা হবে সেটা টিক দিয়ে বেছে নাও — পুরো সাবজেক্ট একসাথে বা আলাদা আলাদা চ্যাপ্টার, দুইভাবেই সিলেক্ট করা যায়। এটা Calendar আর Overview-এ পরীক্ষার প্রিভিউতে দেখাবে।" },
   { target: "[data-tour='ep-share']", title: "Export / Import exam plan", body: "প্ল্যান করা পরীক্ষার তালিকা (মার্ক ছাড়া) টেক্সট হিসেবে বন্ধুর সাথে শেয়ার করতে পারবে, অথবা বন্ধুর পাঠানোটা এখানে ইমপোর্ট করতে পারবে।" },
@@ -5334,7 +5410,7 @@ function ExamPlanPanel({ mixedExams, setMixedExams, track }) {
     setMixedExams([...newItems, ...mixedExams]);
     setPlanImportText("");
     setPlanShareModal(null);
-    alert(`Imported ${newItems.length} exam plan item(s). Check "Marks & Trend" to log marks.`);
+    alert(`Imported ${newItems.length} exam plan item(s). Check "Marks" to log marks.`);
   };
 
   const toggleChapter = (subjectId, chapterId) => {
@@ -5382,7 +5458,7 @@ function ExamPlanPanel({ mixedExams, setMixedExams, track }) {
   return (
     <div>
       <p className="text-sm font-semibold mb-1" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>Plan a new exam</p>
-      <p className="text-xs mb-4" style={{ color: "var(--faint)" }}>Set the date, type, total marks and syllabus here. Marks (yours and anyone you're comparing against) get logged afterward, in "Marks & Trend".</p>
+      <p className="text-xs mb-4" style={{ color: "var(--faint)" }}>Set the date, type, total marks and syllabus here. Marks (yours and anyone you're comparing against) get logged afterward, in "Marks".</p>
 
       <div className="p-3 rounded-lg mb-6" style={{ background: "var(--panel)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", border: "1px solid var(--divider)" }}>
         <div className="flex gap-2 mb-2 flex-wrap" data-tour="ep-form">
@@ -5493,31 +5569,112 @@ function SnapPeoplePickerModal({ trackLabel, people, userName, onConfirm, onClos
 }
 
 const EXAM_RESULTS_TOUR_STEPS = [
-  { target: null, title: "Marks & Trend", body: "প্ল্যান করা প্রতিটা পরীক্ষার মার্ক এখানে বসাবে, আর নিজের প্রোগ্রেসের ট্রেন্ড লাইন (এবং চাইলে বন্ধুদের সাথে তুলনা) দেখবে।" },
-  { target: "[data-tour='er-people']", title: "Compare people", body: "যাদের সাথে নিজের মার্ক তুলনা করতে চাও (বন্ধু/প্রতিদ্বন্দ্বী), তাদের নাম এখানে যোগ করো — তাহলে প্রতিটা পরীক্ষায় তাদের মার্কও বসানোর অপশন আসবে।" },
+  { target: null, title: "Marks", body: "প্ল্যান করা প্রতিটা পরীক্ষার মার্ক এখানে বসাবে। Daily পরীক্ষা 'self exam' হিসেবে ধরা হয় — শুধু নিজের মার্ক বসালেই হবে, কারো সাথে তুলনার দরকার নেই। প্রোগ্রেস গ্রাফ দেখতে 'Trend' ট্যাবে যাও।" },
+  { target: "[data-tour='er-people']", title: "Compare people", body: "যাদের সাথে নিজের মার্ক তুলনা করতে চাও (বন্ধু/প্রতিদ্বন্দ্বী), তাদের নাম এখানে যোগ করো — তাহলে Daily বাদে বাকি পরীক্ষাগুলোতে তাদের মার্কও বসানোর অপশন আসবে।" },
   { target: "[data-tour='er-snap']", title: "Snap", body: "মার্কসহ বা মার্ক ছাড়া — দুইভাবেই পরীক্ষার তালিকার একটা PNG ছবি ডাউনলোড করা যায়।" },
-  { target: "[data-tour='er-list']", title: "পরীক্ষার তালিকা ও মার্ক এন্ট্রি", body: "প্রতিটা পরীক্ষার পাশে নিজের প্রাপ্ত মার্ক বসাও (আর কম্পেয়ার করা মানুষদেরও, যদি থাকে) — % অটোমেটিক হিসাব হয়ে যাবে।" },
-  { target: "[data-tour='er-trend']", title: "ট্রেন্ড চার্ট", body: "একই ট্র্যাকে অন্তত ২টা পরীক্ষার মার্ক বসালে এখানে একটা লাইন চার্টে নিজের (আর তুলনা করা মানুষদের) প্রোগ্রেস ট্র্যাক দেখা যাবে। প্রতিটা চার্টের নিজস্ব 'Snap' বাটন দিয়ে ছবি ডাউনলোডও করা যায়।" },
+  { target: "[data-tour='er-list']", title: "পরীক্ষার তালিকা ও মার্ক এন্ট্রি", body: "প্রতিটা পরীক্ষার পাশে নিজের প্রাপ্ত মার্ক বসাও (আর কম্পেয়ার করা মানুষদেরও, Daily ছাড়া) — % অটোমেটিক হিসাব হয়ে যাবে।" },
 ];
 
-function ExamResultsPanel({ mixedExams, setMixedExams, comparePeople, setComparePeople, dark, userName, userPhoto }) {
-  const theme = chartTheme(dark);
+function ExamMarksPanel({ mixedExams, setMixedExams, comparePeople, setComparePeople, dark, userName, userPhoto }) {
   const descSorted = [...mixedExams].sort((a, b) => (a.date < b.date ? 1 : -1));
-  const ascSorted = [...mixedExams].sort((a, b) => (a.date < b.date ? -1 : 1)).filter((e) => parseFloat(e.totalMarks) > 0);
-  const trackChartRefs = useRef({});
-  const [snapPickerTrackId, setSnapPickerTrackId] = useState(null);
 
   const delExam = (id) => setMixedExams(mixedExams.filter((e) => e.id !== id));
   const updExam = (id, patch) => setMixedExams(mixedExams.map((e) => (e.id === id ? { ...e, ...patch } : e)));
   const updPersonMark = (exam, personId, val) => updExam(exam.id, { peopleMarks: { ...exam.peopleMarks, [personId]: val } });
 
+  const tour = useTabTour("exam-results");
+
+  return (
+    <div>
+      <div data-tour="er-people">
+        <PeoplePanel comparePeople={comparePeople} setComparePeople={setComparePeople} />
+      </div>
+
+      <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+        <p className="text-sm font-semibold" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>Planned / logged exams</p>
+        <div className="flex gap-2" data-tour="er-snap">
+          <button onClick={() => downloadExamPlanSnap({ mixedExams, comparePeople, dark, userName, userPhoto, withMarks: true, label: personalizedSnapLabel(userName, "Exam Marks") })}
+            className="text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5"
+            style={{ background: "var(--surface)", color: "var(--ink)", border: "1px solid var(--border)", fontFamily: "Inter, sans-serif" }}>
+            <Camera size={12} /> Snap (with marks)
+          </button>
+          <button onClick={() => downloadExamPlanSnap({ mixedExams, comparePeople, dark, userName, userPhoto, withMarks: false, label: personalizedSnapLabel(userName, "Exam Plan") })}
+            className="text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5"
+            style={{ background: "var(--surface)", color: "var(--ink)", border: "1px solid var(--border)", fontFamily: "Inter, sans-serif" }}>
+            <Camera size={12} /> Snap (without marks)
+          </button>
+        </div>
+      </div>
+      <div className="space-y-3 mb-6" data-tour="er-list">
+        {descSorted.map((exam) => {
+          const stats = examStats(exam, comparePeople);
+          const trackLabel = TRACKS.find((t) => t.id === exam.examTrack)?.label || exam.examTrack;
+          const syllabusText = buildSyllabusText(exam);
+          const isDaily = exam.examType === "Daily";
+          return (
+            <div key={exam.id} className="p-3 rounded-lg" style={{ background: "var(--panel)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", border: "1px solid var(--divider)" }}>
+              <div className="flex items-center justify-between mb-1 flex-wrap gap-1">
+                <span className="text-sm font-semibold" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>{exam.name}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs" style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--muted)" }}>{exam.date}</span>
+                  <IconBtn onClick={() => delExam(exam.id)}><Trash2 size={14} /></IconBtn>
+                </div>
+              </div>
+              <p className="text-xs mb-2" style={{ color: "var(--faint)" }}>
+                {exam.examType} · {trackLabel}{syllabusText ? ` · ${syllabusText}` : ""}
+                {isDaily && <span style={{ color: "var(--accent)" }}> · self exam</span>}
+              </p>
+              <div className="flex items-center gap-3 flex-wrap text-xs" style={{ fontFamily: "JetBrains Mono, monospace" }}>
+                <label className="flex items-center gap-1" style={{ color: "var(--ink-soft)" }}>
+                  you:
+                  <TinyInput type="number" value={exam.obtainedMarks} onChange={(e) => updExam(exam.id, { obtainedMarks: e.target.value })} style={{ width: 64 }} />
+                  / {exam.totalMarks}{stats.pct !== null ? ` (${stats.pct}%)` : ""}
+                </label>
+                {!isDaily && (comparePeople || []).map((p) => (
+                  <label key={p.id} className="flex items-center gap-1" style={{ color: "#96741F" }}>
+                    {p.name}:
+                    <TinyInput type="number" value={exam.peopleMarks?.[p.id] || ""} onChange={(e) => updPersonMark(exam, p.id, e.target.value)} style={{ width: 64 }} />
+                    {stats.peoplePct[p.id] !== null ? ` (${stats.peoplePct[p.id]}%)` : ""}
+                  </label>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+        {mixedExams.length === 0 && <p className="text-sm" style={{ color: "var(--faint)" }}>No exams planned yet — add one from "Plan Exam".</p>}
+      </div>
+      <TourGuide tourId="exam-results" steps={EXAM_RESULTS_TOUR_STEPS} active={tour.active} onDone={tour.stop} />
+    </div>
+  );
+}
+
+/* SECTION (c) — trend graphs: track-split % trend (you vs competitors) for
+   regular exams, plus a separate self-only "out of total" graph for Daily
+   exams, which are never compared against other people. */
+const EXAM_TREND_TOUR_STEPS = [
+  { target: null, title: "Trend", body: "প্রোগ্রেসের গ্রাফ এখানে দেখবে — সাধারণ পরীক্ষাগুলো (Weekly/Monthly/Model ইত্যাদি) ট্র্যাক অনুযায়ী % ট্রেন্ডে ভাগ করা, আর Daily পরীক্ষাগুলো একদম আলাদা 'self' গ্রাফে (কারো সাথে তুলনা ছাড়া, সরাসরি মার্ক)।" },
+  { target: "[data-tour='et-daily']", title: "Daily exam progress", body: "Daily-type পরীক্ষার মার্ক এখানে সরাসরি (out of total, যেমন ৩০ এর মধ্যে) প্লট হয় — কোনো তুলনা নেই, শুধু নিজের প্রোগ্রেস।" },
+  { target: "[data-tour='et-tracks']", title: "ট্র্যাক অনুযায়ী % ট্রেন্ড", body: "একই ট্র্যাকে অন্তত ২টা (Daily বাদে) পরীক্ষার মার্ক বসালে এখানে একটা লাইন চার্টে নিজের (আর তুলনা করা মানুষদের) প্রোগ্রেস ট্র্যাক দেখা যাবে। প্রতিটা চার্টের নিজস্ব 'Snap' বাটন দিয়ে ছবি ডাউনলোডও করা যায়।" },
+];
+
+function ExamTrendPanel({ mixedExams, comparePeople, dark, userName, userPhoto }) {
+  const theme = chartTheme(dark);
+  const ascSorted = [...mixedExams].sort((a, b) => (a.date < b.date ? -1 : 1)).filter((e) => parseFloat(e.totalMarks) > 0);
+  const ascSortedRegular = ascSorted.filter((e) => e.examType !== "Daily");
+  const ascSortedDaily = ascSorted.filter((e) => e.examType === "Daily");
+  const dailyChartRef = useRef(null);
+  const trackChartRefs = useRef({});
+  const [snapPickerTrackId, setSnapPickerTrackId] = useState(null);
+
   const activePeople = (comparePeople || []).filter((p) => mixedExams.some((e) => e.peopleMarks && e.peopleMarks[p.id] !== undefined && e.peopleMarks[p.id] !== ""));
 
-  const tour = useTabTour("exam-results");
+  const tour = useTabTour("exam-trend");
+
+  const dailyMaxTotal = ascSortedDaily.length ? Math.max(30, ...ascSortedDaily.map((e) => parseFloat(e.totalMarks) || 0)) : 30;
 
   const confirmTrendSnap = (trackId, { includeYou, personIds }) => {
     const t = TRACKS.find((tt) => tt.id === trackId);
-    const trackSorted = ascSorted.filter((e) => (e.examTrack || "engineering") === trackId);
+    const trackSorted = ascSortedRegular.filter((e) => (e.examTrack || "engineering") === trackId);
     const selectedPeople = (comparePeople || []).filter((p) => personIds.includes(p.id));
     const tempCanvas = document.createElement("canvas");
     tempCanvas.width = 640;
@@ -5557,146 +5714,157 @@ function ExamResultsPanel({ mixedExams, setMixedExams, comparePeople, setCompare
     setSnapPickerTrackId(null);
   };
 
+  const snapDaily = () => {
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = 640;
+    tempCanvas.height = 300;
+    const tempChart = new window.Chart(tempCanvas.getContext("2d"), {
+      type: "line",
+      data: {
+        labels: ascSortedDaily.map((e) => e.name || e.date),
+        datasets: [
+          { label: "Obtained", data: ascSortedDaily.map((e) => examStats(e, []).obtained), borderColor: "#1F6F5C", backgroundColor: "#1F6F5C", pointRadius: 4, tension: 0.3, fill: false },
+          { label: "Out of", data: ascSortedDaily.map((e) => parseFloat(e.totalMarks) || 0), borderColor: "#96741F", backgroundColor: "#96741F", pointRadius: 0, borderDash: [5, 4], fill: false },
+        ],
+      },
+      options: {
+        responsive: false, maintainAspectRatio: false, animation: false,
+        plugins: { legend: { labels: { color: theme.text, font: { size: 12 } } } },
+        scales: {
+          x: { ticks: { color: theme.text, font: { size: 10 } }, grid: { color: theme.grid } },
+          y: { min: 0, max: dailyMaxTotal, title: { display: true, text: `out of ${dailyMaxTotal}`, color: theme.text, font: { size: 10 } }, ticks: { color: theme.text, font: { size: 11 } }, grid: { color: theme.grid } },
+        },
+      },
+    });
+    setTimeout(() => {
+      downloadExamTrendSnap({ chartCanvas: tempCanvas, dark, userName, userPhoto, label: personalizedSnapLabel(userName, "Daily Exam Progress") });
+      tempChart.destroy();
+    }, 50);
+  };
+
   return (
     <div>
-      <div data-tour="er-people">
-        <PeoplePanel comparePeople={comparePeople} setComparePeople={setComparePeople} />
-      </div>
-
-      <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-        <p className="text-sm font-semibold" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>Planned / logged exams</p>
-        <div className="flex gap-2" data-tour="er-snap">
-          <button onClick={() => downloadExamPlanSnap({ mixedExams, comparePeople, dark, userName, userPhoto, withMarks: true, label: personalizedSnapLabel(userName, "Exam Marks") })}
-            className="text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5"
-            style={{ background: "var(--surface)", color: "var(--ink)", border: "1px solid var(--border)", fontFamily: "Inter, sans-serif" }}>
-            <Camera size={12} /> Snap (with marks)
-          </button>
-          <button onClick={() => downloadExamPlanSnap({ mixedExams, comparePeople, dark, userName, userPhoto, withMarks: false, label: personalizedSnapLabel(userName, "Exam Plan") })}
-            className="text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5"
-            style={{ background: "var(--surface)", color: "var(--ink)", border: "1px solid var(--border)", fontFamily: "Inter, sans-serif" }}>
-            <Camera size={12} /> Snap (without marks)
-          </button>
+      {ascSortedDaily.length > 0 && (
+        <div className="mb-8" data-tour="et-daily">
+          <p className="text-sm font-semibold mb-1 flex items-center gap-2" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>
+            <TrendingUp size={16} /> Daily exam progress — self
+          </p>
+          <p className="text-xs mb-3" style={{ color: "var(--faint)" }}>Daily exams are your own practice — no comparison needed. Plotted as raw marks out of the exam's total (typically out of {Math.round(dailyMaxTotal)}).</p>
+          <div className="flex justify-end mb-2">
+            <button onClick={snapDaily}
+              className="text-xs font-semibold px-3 py-1 rounded-full flex items-center gap-1.5"
+              style={{ background: "var(--surface)", color: "var(--ink)", border: "1px solid var(--border)", fontFamily: "Inter, sans-serif" }}>
+              <Camera size={11} /> Snap
+            </button>
+          </div>
+          <ChartCanvas
+            type="line"
+            height={260}
+            canvasRef={dailyChartRef}
+            data={{
+              labels: ascSortedDaily.map((e) => e.name || e.date),
+              datasets: [
+                { label: "Obtained", data: ascSortedDaily.map((e) => examStats(e, []).obtained), borderColor: "#1F6F5C", backgroundColor: "#1F6F5C", pointRadius: 4, tension: 0.3, fill: false },
+                { label: "Out of", data: ascSortedDaily.map((e) => parseFloat(e.totalMarks) || 0), borderColor: "#96741F", backgroundColor: "#96741F", pointRadius: 0, borderDash: [5, 4], fill: false },
+              ],
+            }}
+            options={{
+              responsive: true, maintainAspectRatio: false,
+              plugins: { legend: { labels: { color: theme.text, font: { size: 12 } } } },
+              scales: {
+                x: { ticks: { color: theme.text, font: { size: 10 } }, grid: { color: theme.grid } },
+                y: { min: 0, max: dailyMaxTotal, title: { display: true, text: `out of ${dailyMaxTotal}`, color: theme.text, font: { size: 10 } }, ticks: { color: theme.text, font: { size: 11 } }, grid: { color: theme.grid } },
+              },
+            }}
+          />
         </div>
-      </div>
-      <div className="space-y-3 mb-6" data-tour="er-list">
-        {descSorted.map((exam) => {
-          const stats = examStats(exam, comparePeople);
-          const trackLabel = TRACKS.find((t) => t.id === exam.examTrack)?.label || exam.examTrack;
-          const syllabusText = buildSyllabusText(exam);
+      )}
+
+      <div data-tour="et-tracks">
+        <p className="text-sm font-semibold mb-1 flex items-center gap-2" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>
+          <TrendingUp size={16} /> Marks trend — you vs competitors
+        </p>
+        <p className="text-xs mb-4" style={{ color: "var(--faint)" }}>Percentage per exam, so exams with different total marks stay comparable. Split by track — each track's exams only compare against others of the same track. Daily exams aren't included here since they're self-only.</p>
+        {TRACKS.map((t) => {
+          const trackSorted = ascSortedRegular.filter((e) => (e.examTrack || "engineering") === t.id);
+          if (trackSorted.length < 2) return null;
+          if (!trackChartRefs.current[t.id]) trackChartRefs.current[t.id] = { current: null };
           return (
-            <div key={exam.id} className="p-3 rounded-lg" style={{ background: "var(--panel)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", border: "1px solid var(--divider)" }}>
-              <div className="flex items-center justify-between mb-1 flex-wrap gap-1">
-                <span className="text-sm font-semibold" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>{exam.name}</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs" style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--muted)" }}>{exam.date}</span>
-                  <IconBtn onClick={() => delExam(exam.id)}><Trash2 size={14} /></IconBtn>
-                </div>
+            <div key={t.id} className="mb-8">
+              <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                <p className="text-xs font-semibold" style={{ color: "var(--ink)" }}>{t.label}</p>
+                <button onClick={() => setSnapPickerTrackId(t.id)}
+                  className="text-xs font-semibold px-3 py-1 rounded-full flex items-center gap-1.5"
+                  style={{ background: "var(--surface)", color: "var(--ink)", border: "1px solid var(--border)", fontFamily: "Inter, sans-serif" }}>
+                  <Camera size={11} /> Snap
+                </button>
               </div>
-              <p className="text-xs mb-2" style={{ color: "var(--faint)" }}>
-                {exam.examType} · {trackLabel}{syllabusText ? ` · ${syllabusText}` : ""}
-              </p>
-              <div className="flex items-center gap-3 flex-wrap text-xs" style={{ fontFamily: "JetBrains Mono, monospace" }}>
-                <label className="flex items-center gap-1" style={{ color: "var(--ink-soft)" }}>
-                  you:
-                  <TinyInput type="number" value={exam.obtainedMarks} onChange={(e) => updExam(exam.id, { obtainedMarks: e.target.value })} style={{ width: 64 }} />
-                  / {exam.totalMarks}{stats.pct !== null ? ` (${stats.pct}%)` : ""}
-                </label>
-                {(comparePeople || []).map((p) => (
-                  <label key={p.id} className="flex items-center gap-1" style={{ color: "#96741F" }}>
-                    {p.name}:
-                    <TinyInput type="number" value={exam.peopleMarks?.[p.id] || ""} onChange={(e) => updPersonMark(exam, p.id, e.target.value)} style={{ width: 64 }} />
-                    {stats.peoplePct[p.id] !== null ? ` (${stats.peoplePct[p.id]}%)` : ""}
-                  </label>
-                ))}
-              </div>
+              <ChartCanvas
+                type="line"
+                height={260}
+                canvasRef={trackChartRefs.current[t.id]}
+                data={{
+                  labels: trackSorted.map((e) => e.name || e.date),
+                  datasets: [
+                    {
+                      label: "You", data: trackSorted.map((e) => examStats(e, comparePeople).pct),
+                      borderColor: "#1F6F5C", backgroundColor: "#1F6F5C", pointRadius: 4, tension: 0.3, fill: false,
+                    },
+                    ...activePeople.map((p, i) => ({
+                      label: p.name,
+                      data: trackSorted.map((e) => examStats(e, comparePeople).peoplePct[p.id]),
+                      borderColor: PERSON_COLORS[i % PERSON_COLORS.length],
+                      backgroundColor: PERSON_COLORS[i % PERSON_COLORS.length],
+                      pointRadius: 4, tension: 0.3, fill: false, borderDash: [5, 4],
+                    })),
+                  ],
+                }}
+                options={{
+                  responsive: true, maintainAspectRatio: false,
+                  plugins: { legend: { labels: { color: theme.text, font: { size: 12 } } } },
+                  scales: {
+                    x: { ticks: { color: theme.text, font: { size: 10 } }, grid: { color: theme.grid } },
+                    y: { min: 0, max: 100, title: { display: true, text: "%", color: theme.text, font: { size: 10 } }, ticks: { color: theme.text, font: { size: 11 } }, grid: { color: theme.grid } },
+                  },
+                }}
+              />
             </div>
           );
         })}
-        {mixedExams.length === 0 && <p className="text-sm" style={{ color: "var(--faint)" }}>No exams planned yet — add one from "Plan Exam".</p>}
+        {TRACKS.every((t) => ascSortedRegular.filter((e) => (e.examTrack || "engineering") === t.id).length < 2) && (
+          <p className="text-xs" style={{ color: "var(--faint)" }}>Need at least 2 marked exams (Daily excluded) within the same track to draw a trend line.</p>
+        )}
       </div>
 
-      {ascSorted.length > 1 && (
-        <div data-tour="er-trend">
-          <p className="text-sm font-semibold mb-1 flex items-center gap-2" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>
-            <TrendingUp size={16} /> Marks trend — you vs competitors
-          </p>
-          <p className="text-xs mb-4" style={{ color: "var(--faint)" }}>Percentage per exam, so exams with different total marks stay comparable. Split by track — each track's exams (Engineering, Medical, Varsity) only compare against others of the same track.</p>
-          {TRACKS.map((t) => {
-            const trackSorted = ascSorted.filter((e) => (e.examTrack || "engineering") === t.id);
-            if (trackSorted.length < 2) return null;
-            if (!trackChartRefs.current[t.id]) trackChartRefs.current[t.id] = { current: null };
-            return (
-              <div key={t.id} className="mb-8">
-                <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-                  <p className="text-xs font-semibold" style={{ color: "var(--ink)" }}>{t.label}</p>
-                  <button onClick={() => setSnapPickerTrackId(t.id)}
-                    className="text-xs font-semibold px-3 py-1 rounded-full flex items-center gap-1.5"
-                    style={{ background: "var(--surface)", color: "var(--ink)", border: "1px solid var(--border)", fontFamily: "Inter, sans-serif" }}>
-                    <Camera size={11} /> Snap
-                  </button>
-                </div>
-                <ChartCanvas
-                  type="line"
-                  height={260}
-                  canvasRef={trackChartRefs.current[t.id]}
-                  data={{
-                    labels: trackSorted.map((e) => e.name || e.date),
-                    datasets: [
-                      {
-                        label: "You", data: trackSorted.map((e) => examStats(e, comparePeople).pct),
-                        borderColor: "#1F6F5C", backgroundColor: "#1F6F5C", pointRadius: 4, tension: 0.3, fill: false,
-                      },
-                      ...activePeople.map((p, i) => ({
-                        label: p.name,
-                        data: trackSorted.map((e) => examStats(e, comparePeople).peoplePct[p.id]),
-                        borderColor: PERSON_COLORS[i % PERSON_COLORS.length],
-                        backgroundColor: PERSON_COLORS[i % PERSON_COLORS.length],
-                        pointRadius: 4, tension: 0.3, fill: false, borderDash: [5, 4],
-                      })),
-                    ],
-                  }}
-                  options={{
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { labels: { color: theme.text, font: { size: 12 } } } },
-                    scales: {
-                      x: { ticks: { color: theme.text, font: { size: 10 } }, grid: { color: theme.grid } },
-                      y: { min: 0, max: 100, title: { display: true, text: "%", color: theme.text, font: { size: 10 } }, ticks: { color: theme.text, font: { size: 11 } }, grid: { color: theme.grid } },
-                    },
-                  }}
-                />
-              </div>
-            );
-          })}
-          {TRACKS.every((t) => ascSorted.filter((e) => (e.examTrack || "engineering") === t.id).length < 2) && (
-            <p className="text-xs" style={{ color: "var(--faint)" }}>Need at least 2 marked exams within the same track to draw a trend line.</p>
-          )}
-        </div>
+      {ascSorted.length === 0 && (
+        <p className="text-sm" style={{ color: "var(--faint)" }}>No marked exams yet — log some marks in "Marks" first.</p>
       )}
+
       {snapPickerTrackId && (
         <SnapPeoplePickerModal
           key={snapPickerTrackId}
           trackLabel={TRACKS.find((t) => t.id === snapPickerTrackId)?.label || ""}
-          people={(comparePeople || []).filter((p) => mixedExams.some((e) => (e.examTrack || "engineering") === snapPickerTrackId && e.peopleMarks && e.peopleMarks[p.id] !== undefined && e.peopleMarks[p.id] !== ""))}
+          people={(comparePeople || []).filter((p) => mixedExams.some((e) => (e.examTrack || "engineering") === snapPickerTrackId && e.examType !== "Daily" && e.peopleMarks && e.peopleMarks[p.id] !== undefined && e.peopleMarks[p.id] !== ""))}
           userName={userName}
           onClose={() => setSnapPickerTrackId(null)}
           onConfirm={(selection) => confirmTrendSnap(snapPickerTrackId, selection)}
         />
       )}
-      <TourGuide tourId="exam-results" steps={EXAM_RESULTS_TOUR_STEPS} active={tour.active && !snapPickerTrackId} onDone={tour.stop} />
+      <TourGuide tourId="exam-trend" steps={EXAM_TREND_TOUR_STEPS} active={tour.active && !snapPickerTrackId} onDone={tour.stop} />
     </div>
   );
 }
 
 const EXAM_TRACKER_TOUR_STEPS = [
-  { target: "[data-tour='ex-sections']", title: "Exam Tracker-এর ৩টা অংশ", body: "'Plan Exam' দিয়ে আসন্ন পরীক্ষা প্ল্যান করবে, 'Marks & Trend'-এ মার্ক বসিয়ে ট্রেন্ড দেখবে, আর 'Exam Routine'-এ পরীক্ষা-সংক্রান্ত রুটিন (রিভিশন ব্লক, মডেল টেস্ট ইত্যাদি) রাখবে। প্রতিটা অংশে প্রথমবার গেলে আলাদা করে একটা ছোট গাইড দেখাবে।" },
+  { target: "[data-tour='ex-sections']", title: "Exam Tracker-এর ৩টা অংশ", body: "'Plan Exam' দিয়ে আসন্ন পরীক্ষা প্ল্যান করবে, 'Marks'-এ প্রতিটা পরীক্ষার মার্ক বসাবে, আর 'Trend'-এ প্রোগ্রেসের গ্রাফ দেখবে — Daily পরীক্ষাগুলো নিজের জন্য আলাদা 'self' গ্রাফে দেখানো হয়, কারো সাথে তুলনা করা লাগে না। প্রতিটা অংশে প্রথমবার গেলে আলাদা করে একটা ছোট গাইড দেখাবে।" },
 ];
 
-function ExamsTab({ mixedExams, setMixedExams, comparePeople, setComparePeople, examRoutines, setExamRoutines, examRoutineChecks, setExamRoutineChecks, track, dark, userName, userPhoto }) {
-  const [section, setSection] = useState("plan"); // "plan" | "results" | "routine"
+function ExamsTab({ mixedExams, setMixedExams, comparePeople, setComparePeople, track, dark, userName, userPhoto }) {
+  const [section, setSection] = useState("plan"); // "plan" | "marks" | "trend"
   const SECTIONS = [
     ["plan", "Plan Exam"],
-    ["results", "Marks & Trend"],
-    ["routine", "Exam Routine"],
+    ["marks", "Marks"],
+    ["trend", "Trend"],
   ];
   const tour = useTabTour("exam-tracker");
   return (
@@ -5723,310 +5891,13 @@ function ExamsTab({ mixedExams, setMixedExams, comparePeople, setComparePeople, 
         </button>
       </div>
       {section === "plan" && <ExamPlanPanel mixedExams={mixedExams} setMixedExams={setMixedExams} track={track} />}
-      {section === "results" && (
-        <ExamResultsPanel mixedExams={mixedExams} setMixedExams={setMixedExams} comparePeople={comparePeople} setComparePeople={setComparePeople} dark={dark} userName={userName} userPhoto={userPhoto} />
+      {section === "marks" && (
+        <ExamMarksPanel mixedExams={mixedExams} setMixedExams={setMixedExams} comparePeople={comparePeople} setComparePeople={setComparePeople} dark={dark} userName={userName} userPhoto={userPhoto} />
       )}
-      {section === "routine" && (
-        <ExamRoutinePanel examRoutines={examRoutines} setExamRoutines={setExamRoutines} examRoutineChecks={examRoutineChecks} setExamRoutineChecks={setExamRoutineChecks} mixedExams={mixedExams} dark={dark} userName={userName} userPhoto={userPhoto} />
+      {section === "trend" && (
+        <ExamTrendPanel mixedExams={mixedExams} comparePeople={comparePeople} dark={dark} userName={userName} userPhoto={userPhoto} />
       )}
       <TourGuide tourId="exam-tracker" steps={EXAM_TRACKER_TOUR_STEPS} active={tour.active} onDone={tour.stop} />
-    </div>
-  );
-}
-
-/* SECTION (c) — a mini, exam-only version of the Routine tab: recurring or one-off
-   items (revision blocks, coaching test days, anything exam-prep related), kept
-   separate from the general Routine tab. */
-const EXAM_ROUTINE_TOUR_STEPS = [
-  { target: null, title: "Exam Routine", body: "পরীক্ষা-সংক্রান্ত রিভিশন ব্লক, কোচিং টেস্ট ডে, বা অন্য যেকোনো রিমাইন্ডার এখানে রাখো — এটা সাধারণ Routine ট্যাব থেকে আলাদা, খালি পরীক্ষার প্রস্তুতির জন্য।" },
-  { target: "[data-tour='err-share']", title: "Export / Import / Snap", body: "নিজের এক্সাম রুটিন টেক্সট হিসেবে শেয়ার করতে বা বন্ধুরটা ইমপোর্ট করতে পারবে, আর 'Snap' দিয়ে একটা তারিখ রেঞ্জের ছবি ডাউনলোড করা যায়।" },
-  { target: "[data-tour='err-today']", title: "আজকের আইটেম", body: "আজকের জন্য যা যা প্ল্যান করা আছে (রুটিন আইটেম + আজকের কোনো পরীক্ষা থাকলে সেটাও) এখানে চেকলিস্ট আকারে দেখাবে।" },
-  { target: "[data-tour='err-add']", title: "নতুন আইটেম যোগ করা", body: "টাইটেল লিখে, তারিখ বা সাপ্তাহিক পুনরাবৃত্তি (recurring) সেট করে যোগ করো — ঠিক Routine ট্যাবের মতোই কাজ করে।" },
-  { target: "[data-tour='err-list']", title: "পুরো তালিকা", body: "প্ল্যান করা সব পরীক্ষা (হালকা ধূসর, শুধু দেখা যায়, এখান থেকে এডিট হয় না — সেটা 'Plan Exam' থেকে করতে হবে) আর তোমার যোগ করা এক্সাম-রুটিন আইটেম (এডিট/ডিলিট করা যায়) — সব একসাথে এখানে।" },
-];
-
-function ExamRoutinePanel({ examRoutines, setExamRoutines, examRoutineChecks, setExamRoutineChecks, mixedExams, dark, userName, userPhoto }) {
-  const blankForm = { title: "", note: "", recurring: false, daysOfWeek: [], startDate: "", endDate: "", date: fmtDate(new Date()) };
-  const [form, setForm] = useState(blankForm);
-  const [snapOpen, setSnapOpen] = useState(false);
-  const [snapMode, setSnapMode] = useState("calendar"); // "calendar" | "list"
-  const [snapStart, setSnapStart] = useState(fmtDate(new Date()));
-  const [snapEnd, setSnapEnd] = useState(fmtDate(new Date()));
-  const [shareModal, setShareModal] = useState(null); // null | "export" | "import"
-  const [importText, setImportText] = useState("");
-  const shareCopyRef = useRef(null);
-  const [addFormOpen, setAddFormOpen] = useState(false);
-
-  const today = fmtDate(new Date());
-  const examAsItems = (mixedExams || []).map((e) => ({
-    id: `exam-${e.id}`,
-    kind: "exam_routine",
-    title: e.name || "Exam",
-    note: [e.examType, TRACKS.find((t) => t.id === e.examTrack)?.label].filter(Boolean).join(" · "),
-    recurring: false,
-    date: e.date,
-    skipDates: [],
-    fromExam: true,
-  }));
-  const combined = [...examRoutines, ...examAsItems];
-  const todaysItems = routineItemsForDate(combined, today);
-
-  const toggleCheck = (dateStr, id) => {
-    setExamRoutineChecks({ ...examRoutineChecks, [dateStr]: { ...(examRoutineChecks[dateStr] || {}), [id]: !(examRoutineChecks[dateStr] || {})[id] } });
-  };
-  const toggleDow = (d) => setForm((f) => ({ ...f, daysOfWeek: f.daysOfWeek.includes(d) ? f.daysOfWeek.filter((x) => x !== d) : [...f.daysOfWeek, d] }));
-
-  const setSnapWeek = () => {
-    const t = new Date();
-    const dow = t.getDay();
-    setSnapStart(dateAddDays(fmtDate(t), -dow));
-    setSnapEnd(dateAddDays(fmtDate(t), 6 - dow));
-  };
-  const setSnapMonth = () => {
-    const t = new Date();
-    setSnapStart(fmtDate(new Date(t.getFullYear(), t.getMonth(), 1)));
-    setSnapEnd(fmtDate(new Date(t.getFullYear(), t.getMonth() + 1, 0)));
-  };
-  const setSnapToday = () => {
-    const t = fmtDate(new Date());
-    setSnapStart(t);
-    setSnapEnd(t);
-  };
-  const doSnap = () => {
-    if (snapStart > snapEnd) { alert("Start date is after end date — swap them and try again."); return; }
-    if (dateAddDays(snapEnd, 1) > dateAddDays(snapStart, 62)) { alert("That's a big range — pick something under about 2 months so the image stays readable."); return; }
-    const suffix = snapMode === "list" ? "Exam Routine (detailed)" : "Exam Routine";
-    const opts = {
-      startDate: snapStart, endDate: snapEnd, calendarData: {}, routines: examRoutines, routineChecks: examRoutineChecks, mixedExams, dark,
-      label: personalizedSnapLabel(userName, suffix), filenamePrefix: "exam-routine-snap", userName, userPhoto,
-    };
-    if (snapMode === "list") downloadRoutineSnapList(opts);
-    else downloadRoutineSnap(opts);
-  };
-
-  const buildSharePayload = () => ({
-    examRoutineShareVersion: 1,
-    exportedAt: new Date().toISOString(),
-    items: examRoutines.map((r) => ({
-      title: r.title, note: r.note || "",
-      recurring: !!r.recurring, daysOfWeek: r.daysOfWeek || [], startDate: r.startDate || "", endDate: r.endDate || "", date: r.date || "",
-    })),
-  });
-
-  const importShare = () => {
-    if (!importText.trim()) { alert("Paste the exam routine text first."); return; }
-    let data;
-    try { data = JSON.parse(importText); } catch (e) { alert("Couldn't read that — make sure it's exam routine text copied from \"Export exam routine\"."); return; }
-    const items = Array.isArray(data.items) ? data.items : [];
-    if (!items.length) { alert("No exam routine items found in that text."); return; }
-    const key = (it) => [(it.title || "").trim().toLowerCase(), it.date || "", [...(it.daysOfWeek || [])].sort().join(",")].join("|");
-    const existing = new Set(examRoutines.map(key));
-    const newItems = [];
-    items.forEach((it) => {
-      const k = key(it);
-      if (existing.has(k)) return;
-      existing.add(k);
-      newItems.push({
-        id: uid(), kind: "exam_routine", title: it.title || "Untitled", note: it.note || "",
-        recurring: !!it.recurring, daysOfWeek: it.daysOfWeek || [], startDate: it.startDate || "", endDate: it.endDate || "",
-        date: it.date || "", skipDates: [],
-      });
-    });
-    if (!newItems.length) { alert("Everything in that exam routine is already in your list — nothing new to add."); return; }
-    setExamRoutines([...examRoutines, ...newItems]);
-    setImportText("");
-    setShareModal(null);
-    alert(`Imported ${newItems.length} exam routine item(s).`);
-  };
-
-  const save = () => {
-    if (!form.title.trim()) { alert("Add a title first."); return; }
-    if (form.recurring) {
-      if (!form.daysOfWeek.length) { alert("Pick at least one day of the week for a recurring item."); return; }
-      setExamRoutines([{ id: uid(), kind: "exam_routine", title: form.title.trim(), note: form.note, recurring: true, daysOfWeek: form.daysOfWeek, startDate: form.startDate, endDate: form.endDate, skipDates: [] }, ...examRoutines]);
-    } else {
-      if (!form.date) { alert("Pick a date."); return; }
-      setExamRoutines([{ id: uid(), kind: "exam_routine", title: form.title.trim(), note: form.note, recurring: false, date: form.date, skipDates: [] }, ...examRoutines]);
-    }
-    setForm(blankForm);
-    setAddFormOpen(false);
-  };
-  const updateRoutine = (item, patch) => setExamRoutines(examRoutines.map((r) => (r.id === item.id ? { ...r, ...patch } : r)));
-  const deleteRoutine = (item) => {
-    if (!window.confirm(`Remove "${item.title}" from your exam routine?`)) return;
-    setExamRoutines(examRoutines.filter((r) => r.id !== item.id));
-    const nextChecks = {};
-    Object.keys(examRoutineChecks).forEach((d) => {
-      const day = { ...examRoutineChecks[d] };
-      delete day[item.id];
-      nextChecks[d] = day;
-    });
-    setExamRoutineChecks(nextChecks);
-  };
-
-  const routineSortKey = (item) => (item.recurring ? (item.startDate || "0000-00-00") : (item.date || "9999-99-99"));
-  const sorted = [...combined].sort((a, b) => {
-    const ka = routineSortKey(a), kb = routineSortKey(b);
-    return ka < kb ? -1 : ka > kb ? 1 : 0;
-  });
-
-  const tour = useTabTour("exam-routine");
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
-        <div>
-          <p className="text-sm font-semibold" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>Exam routine</p>
-          <p className="text-xs" style={{ color: "var(--faint)" }}>Recurring or one-off items tied to exam prep — revision blocks, coaching test days, anything you want reminded of. Kept separate from the general Routine tab.</p>
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
-          <div className="flex items-center gap-2 flex-wrap" data-tour="err-share">
-            <button onClick={() => setShareModal("export")} className="text-xs font-semibold px-2.5 py-1.5 rounded flex items-center gap-1" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>
-              <Share2 size={13} /> Export
-            </button>
-            <button onClick={() => setShareModal("import")} className="text-xs font-semibold px-2.5 py-1.5 rounded flex items-center gap-1" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>
-              <Upload size={13} /> Import
-            </button>
-            <button onClick={() => setSnapOpen((v) => !v)} className="text-xs font-semibold px-2.5 py-1.5 rounded flex items-center gap-1" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>
-              <Camera size={13} /> Snap
-            </button>
-          </div>
-          <button onClick={tour.replay} className="text-xs font-semibold px-2 py-1.5 rounded flex-shrink-0 flex items-center gap-1"
-            style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--accent)", border: "1px solid var(--border)", background: "var(--surface)" }}
-            title="Replay this section's guide">
-            <HelpCircle size={12} /> guide
-          </button>
-        </div>
-      </div>
-
-      {snapOpen && (
-        <div className="p-3 rounded-lg mb-5 mt-3" style={{ background: "var(--panel)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", border: "1px solid var(--divider)" }}>
-          <p className="text-xs font-semibold mb-1" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>Snap your exam routine as an image</p>
-          <p className="text-xs mb-2" style={{ color: "var(--faint)" }}>Pick a range and download it as a single PNG showing your exam routine items and planned/logged exams, color-coded.</p>
-          <div className="flex gap-1.5 mb-2">
-            <button onClick={() => setSnapMode("calendar")} className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded flex items-center justify-center gap-1"
-              style={{ background: snapMode === "calendar" ? "var(--ink-strong)" : "var(--surface)", color: snapMode === "calendar" ? "var(--on-ink)" : "var(--muted)", border: `1px solid ${snapMode === "calendar" ? "var(--ink-strong)" : "var(--border)"}` }}>
-              <CalendarDays size={12} /> Calendar
-            </button>
-            <button onClick={() => setSnapMode("list")} className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded flex items-center justify-center gap-1"
-              style={{ background: snapMode === "list" ? "var(--ink-strong)" : "var(--surface)", color: snapMode === "list" ? "var(--on-ink)" : "var(--muted)", border: `1px solid ${snapMode === "list" ? "var(--ink-strong)" : "var(--border)"}` }}>
-              <ClipboardList size={12} /> Detailed list
-            </button>
-          </div>
-          <p className="text-xs mb-2" style={{ color: "var(--faint)" }}>
-            {snapMode === "list" ? "A plain itemized table — day, date, type, and event name for every entry, one row each." : "A calendar-grid view of the range, colour-coded chips per day."}
-          </p>
-          <div className="flex gap-2 mb-2 flex-wrap">
-            <button onClick={setSnapToday} className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>today</button>
-            <button onClick={setSnapWeek} className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>this week</button>
-            <button onClick={setSnapMonth} className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>this month</button>
-          </div>
-          <div className="flex items-center gap-2 mb-2 flex-wrap">
-            <label className="text-xs" style={{ color: "var(--muted)" }}>from
-              <TinyInput type="date" value={snapStart} onChange={(e) => setSnapStart(e.target.value)} style={{ display: "block", marginTop: 2 }} />
-            </label>
-            <label className="text-xs" style={{ color: "var(--muted)" }}>to
-              <TinyInput type="date" value={snapEnd} onChange={(e) => setSnapEnd(e.target.value)} style={{ display: "block", marginTop: 2 }} />
-            </label>
-          </div>
-          <button onClick={doSnap} className="text-sm font-semibold px-3 py-1.5 rounded" style={{ background: "var(--ink-strong)", color: "var(--on-ink)" }}>download snap</button>
-        </div>
-      )}
-
-      {todaysItems.length > 0 && (
-        <div className="mb-5" data-tour="err-today">
-          <p className="text-xs font-semibold mb-2 uppercase" style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--muted)", letterSpacing: 0.4 }}>Today · {today}</p>
-          <div className="space-y-2">
-            {todaysItems.map((item) => (
-              <RoutineCard key={item.id} item={item} checked={(examRoutineChecks[today] || {})[item.id]} onToggle={() => toggleCheck(today, item.id)}
-                onUpdate={item.fromExam ? () => {} : (patch) => updateRoutine(item, patch)} onDelete={item.fromExam ? () => {} : () => deleteRoutine(item)} readOnly={!!item.fromExam} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="p-3 rounded-lg mb-6" data-tour="err-add" style={{ background: "var(--panel)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", border: "1px solid var(--divider)" }}>
-        <button onClick={() => setAddFormOpen((v) => !v)} type="button" className="w-full flex items-center justify-between gap-2">
-          <span className="text-xs font-semibold" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>Add exam routine item</span>
-          {addFormOpen ? <ChevronDown size={14} color="var(--muted)" /> : <ChevronRight size={14} color="var(--muted)" />}
-        </button>
-        {addFormOpen && (
-          <div className="mt-2">
-            <TinyInput placeholder="title e.g. Revision block, Model test day" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} style={{ width: "100%", marginBottom: 8 }} />
-            <label className="flex items-center gap-1.5 text-xs mb-2" style={{ color: "var(--muted)" }}>
-              <input type="checkbox" checked={form.recurring} onChange={(e) => setForm((f) => ({ ...f, recurring: e.target.checked }))} />
-              recurring (repeats weekly)
-            </label>
-            {form.recurring ? (
-              <div className="mb-2">
-                <div className="flex gap-1 mb-2">
-                  {DOW_LABELS.map((d, i) => (
-                    <button key={i} onClick={() => toggleDow(i)} type="button"
-                      className="w-7 h-7 rounded-full text-xs"
-                      style={{ background: form.daysOfWeek.includes(i) ? "var(--ink-strong)" : "var(--surface)", color: form.daysOfWeek.includes(i) ? "var(--on-ink)" : "var(--ink-soft)", border: "1px solid var(--border)" }}>
-                      {d}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex gap-2 flex-wrap">
-                  <label className="text-xs" style={{ color: "var(--muted)" }}>from
-                    <TinyInput type="date" value={form.startDate} onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))} style={{ display: "block", marginTop: 2 }} />
-                  </label>
-                  <label className="text-xs" style={{ color: "var(--muted)" }}>until (optional)
-                    <TinyInput type="date" value={form.endDate} onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))} style={{ display: "block", marginTop: 2 }} />
-                  </label>
-                </div>
-              </div>
-            ) : (
-              <div className="mb-2">
-                <TinyInput type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} />
-              </div>
-            )}
-            <textarea placeholder="note (optional)" value={form.note} onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
-              className="w-full text-xs rounded border p-2 mb-2 tk-field" style={{ borderColor: "var(--border)", fontFamily: "Inter, sans-serif" }} rows={1} />
-            <button onClick={save} className="w-full text-sm font-semibold py-2 rounded" style={{ background: "var(--ink-strong)", color: "var(--on-ink)" }}>add</button>
-          </div>
-        )}
-      </div>
-
-      <div className="space-y-2" data-tour="err-list">
-        {sorted.map((item) => (
-          <RoutineCard key={item.id} item={item} checked={null} onToggle={null}
-            onUpdate={item.fromExam ? () => {} : (patch) => updateRoutine(item, patch)} onDelete={item.fromExam ? () => {} : () => deleteRoutine(item)} readOnly={!!item.fromExam} />
-        ))}
-        {sorted.length === 0 && <p className="text-sm" style={{ color: "var(--faint)" }}>No exam routine items yet.</p>}
-      </div>
-
-      {shareModal === "export" && (
-        <ModalShell title="EXAM ROUTINE" subtitle="Copy this to share your exam routine" onClose={() => setShareModal(null)}>
-          <p className="text-xs mb-2" style={{ color: "var(--faint)" }}>
-            This only includes items you added here — no planned/logged exams, completion history, or marks. Send the copied text to a friend; they paste it into "Import" on their own Ledger.
-          </p>
-          <textarea ref={shareCopyRef} readOnly value={JSON.stringify(buildSharePayload())} onFocus={(e) => e.target.select()}
-            className="w-full text-xs p-2 rounded mb-2 tk-field" style={{ height: 140, resize: "none", border: "1px solid var(--border)", fontFamily: "JetBrains Mono, monospace" }} />
-          <button onClick={() => {
-            const ta = shareCopyRef.current;
-            try { ta.focus(); ta.select(); const ok = document.execCommand && document.execCommand("copy"); alert(ok ? "Copied! Send it to your friend." : "Selected — use your keyboard's Copy option."); }
-            catch (err) { alert("Selected — use your keyboard's Copy option."); }
-          }} className="w-full text-xs font-semibold px-2 py-1.5 rounded" style={{ background: "var(--ink-strong)", color: "var(--on-ink)" }}>
-            Select &amp; copy
-          </button>
-        </ModalShell>
-      )}
-
-      {shareModal === "import" && (
-        <ModalShell title="EXAM ROUTINE" subtitle="Paste a friend's shared exam routine" onClose={() => setShareModal(null)}>
-          <p className="text-xs mb-2" style={{ color: "var(--faint)" }}>
-            This adds to your existing exam routine — it won't remove anything you already have. Duplicate items (same title and date/days) are skipped.
-          </p>
-          <textarea value={importText} onChange={(e) => setImportText(e.target.value)} placeholder="Paste shared exam routine text here…"
-            className="w-full text-xs p-2 rounded mb-2 tk-field" style={{ height: 140, resize: "none", border: "1px solid var(--border)", fontFamily: "JetBrains Mono, monospace" }} />
-          <button onClick={importShare} className="w-full text-xs font-semibold px-2 py-1.5 rounded" style={{ background: "var(--ink-strong)", color: "var(--on-ink)" }}>
-            Import
-          </button>
-        </ModalShell>
-      )}
-      <TourGuide tourId="exam-routine" steps={EXAM_ROUTINE_TOUR_STEPS} active={tour.active && !snapOpen && !shareModal} onDone={tour.stop} />
     </div>
   );
 }
@@ -7784,7 +7655,7 @@ const THEME_IDS = THEMES.map((t) => t.id);
 // Shared "tap a name → see their overview" profile card. Works from the
 // leaderboard, chat friends/directory lists, and study-buddy suggestions —
 // anywhere a person's name appears, this shows their public progress snapshot.
-function ProfileModal({ profile, isMe, isFriend, requestSent, isBlocked, onClose, onMessage, onAddFriend, onToggleBlock }) {
+function ProfileModal({ profile, isMe, isFriend, requestSent, onClose, onMessage, onAddFriend }) {
   if (!profile) return null;
   return (
     <ModalShell title="প্রোফাইল" subtitle={profile.name || "Anonymous"} onClose={onClose}>
@@ -7836,28 +7707,22 @@ function ProfileModal({ profile, isMe, isFriend, requestSent, isBlocked, onClose
 
       {!isMe && (onMessage || onAddFriend) && (
         <div className="flex gap-2">
-          {onMessage && !isBlocked && (
+          {onMessage && (
             <button onClick={onMessage} className="flex-1 text-sm font-semibold px-3 py-2 rounded-lg" style={{ background: "var(--accent)", color: "#fff" }}>
               মেসেজ পাঠান
             </button>
           )}
-          {onAddFriend && !isFriend && !isBlocked && (
+          {onAddFriend && !isFriend && (
             <button onClick={onAddFriend} disabled={requestSent}
               className="flex-1 text-sm font-semibold px-3 py-2 rounded-lg"
               style={{ border: "1px solid var(--border)", color: "var(--ink)", opacity: requestSent ? 0.6 : 1 }}>
               {requestSent ? "অনুরোধ পাঠানো হয়েছে" : "+ বন্ধু"}
             </button>
           )}
-          {isFriend && !isBlocked && (
+          {isFriend && !onMessage && (
             <span className="flex-1 text-sm text-center px-3 py-2" style={{ color: "var(--muted)" }}>ইতিমধ্যে বন্ধু</span>
           )}
         </div>
-      )}
-      {!isMe && onToggleBlock && (
-        <button onClick={onToggleBlock} className="w-full text-xs font-semibold px-3 py-2 rounded-lg mt-2"
-          style={{ border: "1px solid var(--border)", color: isBlocked ? "var(--accent)" : "#A5473A" }}>
-          {isBlocked ? "আনব্লক করুন" : "🚫 ব্লক করুন"}
-        </button>
       )}
     </ModalShell>
   );
@@ -7871,7 +7736,6 @@ function CommunityTab({ dark, userName, userPhoto, track }) {
   const [friendMap, setFriendMap] = useState({});
   const [requestSentIds, setRequestSentIds] = useState([]);
   const [jumpToUserId, setJumpToUserId] = useState(null);
-  const [blockedIds, setBlockedIds] = useState([]);
   const cs = window.cloudSync;
   const myId = cs && cs.getUserId ? cs.getUserId() : null;
 
@@ -7880,14 +7744,12 @@ function CommunityTab({ dark, userName, userPhoto, track }) {
   const refresh = useCallback(async () => {
     if (!window.cloudSync || !window.cloudSync.enabled) return;
     try {
-      const [data, fm, blocked] = await Promise.all([
+      const [data, fm] = await Promise.all([
         window.cloudSync.fetchLeaderboard(),
         window.cloudSync.fetchFriendStatusMap(),
-        window.cloudSync.fetchBlockedUsers(),
       ]);
       setRows(data);
       setFriendMap(fm);
-      setBlockedIds(blocked);
     } catch (e) {
       setError("লিডারবোর্ড লোড করা যায়নি।");
     }
@@ -7900,16 +7762,6 @@ function CommunityTab({ dark, userName, userPhoto, track }) {
       await cs.sendFriendRequest(userId);
       setRequestSentIds((prev) => [...prev, userId]);
     } catch (e) {}
-  }
-
-  async function toggleBlock(userId) {
-    if (blockedIds.includes(userId)) {
-      await cs.unblockUser(userId);
-      setBlockedIds((prev) => prev.filter((id) => id !== userId));
-    } else {
-      await cs.blockUser(userId);
-      setBlockedIds((prev) => [...prev, userId]);
-    }
   }
 
   function messageUser(userId) {
@@ -7935,7 +7787,7 @@ function CommunityTab({ dark, userName, userPhoto, track }) {
   // Study buddy — same track, closest overall progress to yours (so it's a fair match, not a leader vs. beginner).
   let buddy = null;
   if (myRow) {
-    const candidates = allRows.filter((r) => r.user_id !== myId && r.track === myRow.track && !blockedIds.includes(r.user_id));
+    const candidates = allRows.filter((r) => r.user_id !== myId && r.track === myRow.track);
     let bestDiff = Infinity;
     candidates.forEach((r) => {
       const diff = Math.abs((r.overall_progress || 0) - (myRow.overall_progress || 0));
@@ -8110,11 +7962,9 @@ function CommunityTab({ dark, userName, userPhoto, track }) {
           isMe={profileUser.user_id === myId}
           isFriend={friendMap[profileUser.user_id]?.state === "friends"}
           requestSent={requestSentIds.includes(profileUser.user_id) || friendMap[profileUser.user_id]?.state === "pending_sent"}
-          isBlocked={blockedIds.includes(profileUser.user_id)}
           onClose={() => setProfileUser(null)}
           onMessage={() => messageUser(profileUser.user_id)}
           onAddFriend={() => addFriend(profileUser.user_id)}
-          onToggleBlock={() => toggleBlock(profileUser.user_id)}
         />
       )}
     </div>
@@ -8141,8 +7991,6 @@ function ChatHub({ dark, userName, userPhoto, myTrack, jumpToUserId, onJumpHandl
   const [mobileThreadOpen, setMobileThreadOpen] = useState(false);
   const [active, setActive] = useState({ type: "group", groupId: COMMUNITY_GROUP_ID, name: "Community" });
   const [onlineIds, setOnlineIds] = useState([]);
-  const [blockedIds, setBlockedIds] = useState([]);
-  const [showBlocked, setShowBlocked] = useState(false);
 
   // Presence — a small green dot next to whoever is online right now.
   useEffect(() => {
@@ -8167,15 +8015,14 @@ function ChatHub({ dark, userName, userPhoto, myTrack, jumpToUserId, onJumpHandl
   }
 
   const loadSidebar = useCallback(async () => {
-    const [dir, gs, fm, inc, rs, blocked] = await Promise.all([
-      cs.fetchDirectory(), cs.fetchMyGroups(), cs.fetchFriendStatusMap(), cs.fetchFriendRequestsIncoming(), cs.fetchReadState(), cs.fetchBlockedUsers(),
+    const [dir, gs, fm, inc, rs] = await Promise.all([
+      cs.fetchDirectory(), cs.fetchMyGroups(), cs.fetchFriendStatusMap(), cs.fetchFriendRequestsIncoming(), cs.fetchReadState(),
     ]);
     setDirectory(dir);
     setGroups(gs);
     setFriendMap(fm);
     setIncomingRequests(inc);
     setReadState(rs);
-    setBlockedIds(blocked);
     const act = await cs.fetchRecentActivity(gs.map((g) => g.id));
     setActivity(act);
   }, []);
@@ -8232,27 +8079,12 @@ function ChatHub({ dark, userName, userPhoto, myTrack, jumpToUserId, onJumpHandl
   const friendIds = Object.keys(friendMap).filter((uid) => friendMap[uid].state === "friends");
   const filteredDirectory = directory.filter((d) => {
     if (!d.user_id || d.user_id === myId) return false;
-    if (blockedIds.includes(d.user_id)) return false;
     if (!search.trim()) return true;
     return (d.name || "").toLowerCase().includes(search.trim().toLowerCase());
   });
   const suggestedFriends = myTrack
-    ? directory.filter((d) => d.user_id && d.user_id !== myId && d.track === myTrack && !friendMap[d.user_id] && !blockedIds.includes(d.user_id)).slice(0, 5)
+    ? directory.filter((d) => d.user_id && d.user_id !== myId && d.track === myTrack && !friendMap[d.user_id]).slice(0, 5)
     : [];
-
-  async function toggleBlock(userId) {
-    if (blockedIds.includes(userId)) {
-      await cs.unblockUser(userId);
-      setBlockedIds((prev) => prev.filter((id) => id !== userId));
-    } else {
-      await cs.blockUser(userId);
-      setBlockedIds((prev) => [...prev, userId]);
-      // if you're currently viewing this person's DM, back out to Community
-      if (active.type === "dm" && active.recipientId === userId) {
-        openConversation({ type: "group", groupId: COMMUNITY_GROUP_ID, name: "Community" });
-      }
-    }
-  }
 
   // Shared glass-glow style for the active conversation in the sidebar list.
   function navItemStyle(isActive) {
@@ -8302,17 +8134,10 @@ function ChatHub({ dark, userName, userPhoto, myTrack, jumpToUserId, onJumpHandl
           )}
         </button>
 
-        <button onClick={() => setShowBlocked(true)} className="w-full text-left text-xs px-3 py-2 rounded-lg flex items-center justify-between" style={{ color: dark ? "#ddd" : "#333" }}>
-          <span>ব্লক করা ব্যবহারকারী</span>
-          {blockedIds.length > 0 && (
-            <span className="text-[10px] px-1.5 rounded-full" style={{ border: "1px solid var(--border)", color: "var(--muted)" }}>{blockedIds.length}</span>
-          )}
-        </button>
-
-        {friendIds.filter((uid) => !blockedIds.includes(uid)).length > 0 && (
+        {friendIds.length > 0 && (
           <div className="pt-2 mt-2" style={{ borderTop: "1px solid var(--border)" }}>
             <p className="text-xs px-3 mb-1" style={{ color: dark ? "#888" : "#999" }}>বন্ধুরা</p>
-            {friendIds.filter((uid) => !blockedIds.includes(uid)).map((uid) => {
+            {friendIds.map((uid) => {
               const p = directory.find((d) => d.user_id === uid);
               const key = convKeyForDM(myId, uid);
               return (
@@ -8389,11 +8214,6 @@ function ChatHub({ dark, userName, userPhoto, myTrack, jumpToUserId, onJumpHandl
           onBack={() => setMobileThreadOpen(false)}
           onLeftGroup={() => { loadSidebar(); openConversation({ type: "group", groupId: COMMUNITY_GROUP_ID, name: "Community" }); }}
           onOpenProfile={openProfile}
-          isFriend={active.type === "dm" ? friendMap[active.recipientId]?.state === "friends" : true}
-          friendState={active.type === "dm" ? (friendMap[active.recipientId]?.state || null) : null}
-          onSendFriendRequest={active.type === "dm" ? async () => { await cs.sendFriendRequest(active.recipientId); loadSidebar(); } : null}
-          isBlocked={active.type === "dm" ? blockedIds.includes(active.recipientId) : false}
-          onToggleBlock={active.type === "dm" ? () => toggleBlock(active.recipientId) : null}
         />
       </div>
 
@@ -8435,34 +8255,13 @@ function ChatHub({ dark, userName, userPhoto, myTrack, jumpToUserId, onJumpHandl
           )}
         </ModalShell>
       )}
-
-      {showBlocked && (
-        <ModalShell title="ব্লক করা ব্যবহারকারী" subtitle="এদের কাছ থেকে/এদের কাছে মেসেজ যাবে না" onClose={() => setShowBlocked(false)}>
-          {blockedIds.length === 0 ? (
-            <p className="text-sm" style={{ color: "var(--muted)" }}>আপনি কাউকে ব্লক করেননি।</p>
-          ) : (
-            <div className="space-y-2">
-              {blockedIds.map((uid) => {
-                const p = directory.find((d) => d.user_id === uid);
-                return (
-                  <div key={uid} className="flex items-center justify-between text-sm px-2 py-2 rounded" style={{ border: "1px solid var(--border)" }}>
-                    <span>{p?.name || "Anonymous"}</span>
-                    <button onClick={() => toggleBlock(uid)}
-                      className="text-xs px-2 py-1 rounded" style={{ background: "var(--accent)", color: "#fff" }}>আনব্লক</button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </ModalShell>
-      )}
     </div>
   );
 }
 
 const REACTION_EMOJIS = ["👍", "🔥", "❤️"];
 
-function ChatThread({ dark, userName, userPhoto, active, directory, myId: myIdProp, onBack, onLeftGroup, onOpenProfile, isFriend, friendState, onSendFriendRequest, isBlocked, onToggleBlock }) {
+function ChatThread({ dark, userName, userPhoto, active, directory, myId: myIdProp, onBack, onLeftGroup, onOpenProfile }) {
   const cs = window.cloudSync;
   const [messages, setMessages] = useState(null);
   const [reactions, setReactions] = useState({});
@@ -8608,11 +8407,6 @@ function ChatThread({ dark, userName, userPhoto, active, directory, myId: myIdPr
               👥 মেম্বার
             </button>
           )}
-          {active.type === "dm" && onToggleBlock && (
-            <button onClick={onToggleBlock} className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ border: "1px solid var(--border)", color: isBlocked ? "var(--accent)" : "var(--muted)" }}>
-              {isBlocked ? "আনব্লক" : "🚫 ব্লক"}
-            </button>
-          )}
           <span className="text-[10px]" style={{ color: "var(--faint)" }}>৭২ ঘণ্টা পর মুছে যায়</span>
         </div>
       </div>
@@ -8687,53 +8481,29 @@ function ChatThread({ dark, userName, userPhoto, active, directory, myId: myIdPr
         )}
       </div>
       {error && <p className="text-xs px-3 pt-1" style={{ color: "#e2725b" }}>{error}</p>}
-      {active.type === "dm" && isBlocked ? (
-        <div className="flex items-center justify-between gap-2 p-3" style={{
-          borderTop: "1px solid var(--border)", background: "var(--panel)",
-        }}>
-          <span className="text-xs" style={{ color: "var(--muted)" }}>আপনি এই ব্যবহারকারীকে ব্লক করেছেন — মেসেজ পাঠানো/পাওয়া বন্ধ আছে।</span>
-          {onToggleBlock && (
-            <button onClick={onToggleBlock} className="text-xs font-semibold px-3 py-1.5 rounded-full flex-shrink-0" style={{ background: "var(--accent)", color: "#fff" }}>আনব্লক</button>
-          )}
-        </div>
-      ) : active.type === "dm" && !isFriend ? (
-        <div className="flex items-center justify-between gap-2 p-3" style={{
-          borderTop: "1px solid var(--border)", background: "var(--panel)",
-        }}>
-          <span className="text-xs" style={{ color: "var(--muted)" }}>
-            {friendState === "pending_sent" ? "বন্ধু অনুরোধ পাঠানো হয়েছে — গ্রহণ করলে মেসেজ পাঠাতে পারবেন।"
-              : friendState === "pending_received" ? "এই ব্যবহারকারী আপনাকে বন্ধু অনুরোধ পাঠিয়েছে — 'বন্ধুর অনুরোধ' থেকে গ্রহণ করুন।"
-              : "শুধু বন্ধুদের সাথেই মেসেজ পাঠানো যায় — আগে বন্ধু অনুরোধ পাঠান।"}
-          </span>
-          {friendState !== "pending_sent" && friendState !== "pending_received" && onSendFriendRequest && (
-            <button onClick={onSendFriendRequest} className="text-xs font-semibold px-3 py-1.5 rounded-full flex-shrink-0" style={{ background: "var(--accent)", color: "#fff" }}>+ বন্ধু</button>
-          )}
-        </div>
-      ) : (
-        <form onSubmit={submit} className="flex items-center gap-2 p-2" style={{
-          borderTop: "1px solid var(--border)", background: "linear-gradient(0deg, var(--panel), var(--surface))",
-          backdropFilter: "blur(18px) saturate(140%)", WebkitBackdropFilter: "blur(18px) saturate(140%)",
-        }}>
-          <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePickImage} style={{ display: "none" }} />
-          <button type="button" onClick={() => fileInputRef.current && fileInputRef.current.click()}
-            disabled={imageUploading} title="ছবি পাঠান"
-            className="flex-shrink-0 flex items-center justify-center rounded-full"
-            style={{ width: 36, height: 36, border: "1px solid var(--border)", color: "var(--muted)", opacity: imageUploading ? 0.5 : 1 }}>
-            {imageUploading ? "…" : "📷"}
-          </button>
-          <input
-            type="text" value={draft} onChange={(e) => setDraft(e.target.value)}
-            placeholder="একটা মেসেজ লিখুন…" maxLength={500}
-            className="flex-1 text-sm px-3 py-2 rounded-full tk-field"
-            style={{ border: "1px solid var(--border)" }}
-          />
-          <button type="submit" disabled={sending || !draft.trim()}
-            className="text-sm font-semibold px-4 py-2 rounded-full flex-shrink-0"
-            style={{ background: "var(--accent)", color: "#fff", opacity: sending || !draft.trim() ? 0.6 : 1 }}>
-            পাঠান
-          </button>
-        </form>
-      )}
+      <form onSubmit={submit} className="flex items-center gap-2 p-2" style={{
+        borderTop: "1px solid var(--border)", background: "linear-gradient(0deg, var(--panel), var(--surface))",
+        backdropFilter: "blur(18px) saturate(140%)", WebkitBackdropFilter: "blur(18px) saturate(140%)",
+      }}>
+        <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePickImage} style={{ display: "none" }} />
+        <button type="button" onClick={() => fileInputRef.current && fileInputRef.current.click()}
+          disabled={imageUploading} title="ছবি পাঠান"
+          className="flex-shrink-0 flex items-center justify-center rounded-full"
+          style={{ width: 36, height: 36, border: "1px solid var(--border)", color: "var(--muted)", opacity: imageUploading ? 0.5 : 1 }}>
+          {imageUploading ? "…" : "📷"}
+        </button>
+        <input
+          type="text" value={draft} onChange={(e) => setDraft(e.target.value)}
+          placeholder="একটা মেসেজ লিখুন…" maxLength={500}
+          className="flex-1 text-sm px-3 py-2 rounded-full tk-field"
+          style={{ border: "1px solid var(--border)" }}
+        />
+        <button type="submit" disabled={sending || !draft.trim()}
+          className="text-sm font-semibold px-4 py-2 rounded-full flex-shrink-0"
+          style={{ background: "var(--accent)", color: "#fff", opacity: sending || !draft.trim() ? 0.6 : 1 }}>
+          পাঠান
+        </button>
+      </form>
 
       {showMembers && (
         <ModalShell title="গ্রুপ" subtitle={active.name} onClose={() => setShowMembers(false)}>
@@ -8809,6 +8579,7 @@ function AuthGate({ children }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     if (!cs || !cs.enabled) return;
@@ -8858,43 +8629,119 @@ function AuthGate({ children }) {
     // Supabase not configured — fall back to fully local/offline mode, no login required.
     return children;
   }
+
   if (status === "checking") {
-    return React.createElement("p", { style: { color: "#ccc", fontFamily: "sans-serif", padding: 24 } }, "লোড হচ্ছে…");
+    return (
+      <div className="auth-wrap">
+        <div className="auth-blob a1"></div>
+        <div className="auth-blob a2"></div>
+        <div className="auth-blob a3"></div>
+        <div className="auth-card" style={{ textAlign: "center" }}>
+          <div className="auth-logo-wrap">
+            <div className="auth-logo-ring"></div>
+            <div className="auth-logo"><img src={window.APP_LOGO_URL} alt="" /></div>
+          </div>
+          <p className="auth-title">Admission Prep Ledger</p>
+          <p className="auth-subtitle">লোড হচ্ছে…</p>
+          <div className="auth-spinner" style={{ margin: "18px auto 0", borderTopColor: "#F0AE72", borderColor: "rgba(255,255,255,0.12)" }}></div>
+        </div>
+      </div>
+    );
   }
+
   if (status === "ready") {
     return children;
   }
 
-  return React.createElement(
-    "div",
-    { style: { minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#14161A", fontFamily: "Inter, sans-serif" } },
-    React.createElement(
-      "form",
-      { onSubmit: submit, style: { width: 320, background: "#1c1f26", padding: 28, borderRadius: 12, border: "1px solid #2a2e37" } },
-      React.createElement("img", { src: window.APP_LOGO_URL, alt: "", style: { width: 56, height: 56, display: "block", margin: "0 auto 12px", borderRadius: 12 } }),
-      React.createElement("h1", { style: { color: "#fff", fontSize: 18, fontWeight: 700, marginBottom: 4, textAlign: "center" } }, "Admission Prep Ledger"),
-      React.createElement("p", { style: { color: "#9aa1ad", fontSize: 12, marginBottom: 16, textAlign: "center" } }, mode === "signup" ? "নতুন অ্যাকাউন্ট বানান" : "সাইন-ইন করুন"),
-      error && React.createElement("p", { style: { color: "#e2725b", fontSize: 12, marginBottom: 10 } }, error),
-      notice && React.createElement("p", { style: { color: "#7fd08a", fontSize: 12, marginBottom: 10 } }, notice),
-      React.createElement("input", {
-        type: "email", required: true, placeholder: "ইমেইল", value: email,
-        onChange: (e) => setEmail(e.target.value),
-        style: { width: "100%", padding: "8px 10px", marginBottom: 10, borderRadius: 6, border: "1px solid #333", background: "#14161A", color: "#fff", fontSize: 13, boxSizing: "border-box" },
-      }),
-      React.createElement("input", {
-        type: "password", required: true, minLength: 6, placeholder: "পাসওয়ার্ড (অন্তত ৬ ক্যারেক্টার)", value: password,
-        onChange: (e) => setPassword(e.target.value),
-        style: { width: "100%", padding: "8px 10px", marginBottom: 14, borderRadius: 6, border: "1px solid #333", background: "#14161A", color: "#fff", fontSize: 13, boxSizing: "border-box" },
-      }),
-      React.createElement("button", {
-        type: "submit", disabled: busy,
-        style: { width: "100%", padding: "9px 0", borderRadius: 6, border: "none", background: "#C6541A", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" },
-      }, busy ? "..." : mode === "signup" ? "সাইন আপ" : "সাইন ইন"),
-      React.createElement(
-        "p", { style: { color: "#9aa1ad", fontSize: 12, marginTop: 14, textAlign: "center", cursor: "pointer" }, onClick: () => { setMode(mode === "signup" ? "signin" : "signup"); setError(""); setNotice(""); } },
-        mode === "signup" ? "আগে থেকে অ্যাকাউন্ট আছে? সাইন ইন করুন" : "নতুন? সাইন আপ করুন"
-      )
-    )
+  const switchMode = (next) => { if (next === mode) return; setMode(next); setError(""); setNotice(""); };
+
+  return (
+    <div className="auth-wrap">
+      <div className="auth-blob a1"></div>
+      <div className="auth-blob a2"></div>
+      <div className="auth-blob a3"></div>
+
+      <form className="auth-card" onSubmit={submit}>
+        <div className="auth-logo-wrap">
+          <div className="auth-logo-ring"></div>
+          <div className="auth-logo"><img src={window.APP_LOGO_URL} alt="" /></div>
+        </div>
+        <p className="auth-title">Admission Prep Ledger</p>
+        <p className="auth-subtitle">Engineering · Medical · Varsity · IBA</p>
+
+        <div className="auth-tabs">
+          <div className="auth-tab-highlight" style={{ transform: mode === "signup" ? "translateX(100%)" : "translateX(0)" }}></div>
+          <div className={"auth-tab" + (mode === "signin" ? " active" : "")} onClick={() => switchMode("signin")}>সাইন ইন</div>
+          <div className={"auth-tab" + (mode === "signup" ? " active" : "")} onClick={() => switchMode("signup")}>সাইন আপ</div>
+        </div>
+
+        {error && (
+          <div className="auth-msg auth-msg-error">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}>
+              <circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <span>{error}</span>
+          </div>
+        )}
+        {notice && (
+          <div className="auth-msg auth-msg-notice">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}>
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+            <span>{notice}</span>
+          </div>
+        )}
+
+        <div className="auth-field">
+          <svg className="auth-field-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FBEEDC" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+            <polyline points="22,6 12,13 2,6"></polyline>
+          </svg>
+          <input
+            className="auth-input" type="email" required autoComplete="email" placeholder="ইমেইল" value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </div>
+
+        <div className="auth-field">
+          <svg className="auth-field-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FBEEDC" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+          <input
+            className="auth-input" type={showPassword ? "text" : "password"} required minLength={6}
+            autoComplete={mode === "signup" ? "new-password" : "current-password"}
+            placeholder="পাসওয়ার্ড (অন্তত ৬ ক্যারেক্টার)" value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <button type="button" className="auth-eye-btn" onClick={() => setShowPassword((v) => !v)} tabIndex={-1} aria-label="toggle password visibility">
+            {showPassword ? (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                <line x1="1" y1="1" x2="23" y2="23"></line>
+              </svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            )}
+          </button>
+        </div>
+
+        <button type="submit" className="auth-submit" disabled={busy}>
+          {busy ? <span className="auth-spinner"></span> : (mode === "signup" ? "সাইন আপ করুন" : "সাইন ইন করুন")}
+        </button>
+
+        <p className="auth-switch">
+          {mode === "signup" ? (
+            <React.Fragment>আগে থেকে অ্যাকাউন্ট আছে? <b onClick={() => switchMode("signin")}>সাইন ইন করুন</b></React.Fragment>
+          ) : (
+            <React.Fragment>নতুন? <b onClick={() => switchMode("signup")}>সাইন আপ করুন</b></React.Fragment>
+          )}
+        </p>
+      </form>
+    </div>
   );
 }
 
