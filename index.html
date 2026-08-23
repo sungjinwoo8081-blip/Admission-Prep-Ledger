@@ -2657,7 +2657,7 @@ async function downloadExamPlanSnap({ mixedExams, comparePeople, dark, userName 
   const measureCanvas = document.createElement("canvas");
   const measureCtx = measureCanvas.getContext("2d");
   measureCtx.font = "500 10.5px Inter, sans-serif";
-  const colDate = 76, colMarks = withMarks ? 96 : 0;
+  const colDate = 96, colMarks = withMarks ? 96 : 0;
   const colName_syllabus = W - pad * 2 - colDate - colMarks;
   const rowLines = rows.map((r) => {
     const nameLines = wrapText(measureCtx, r.name, colName_syllabus);
@@ -2723,7 +2723,8 @@ async function downloadExamPlanSnap({ mixedExams, comparePeople, dark, userName 
 
       ctx.font = "500 10.5px Inter, sans-serif";
       ctx.fillStyle = muted;
-      ctx.fillText(formatPretty(r.date).replace(",", ""), colX.date, y + 16);
+      const dow = DOW_FULL[new Date(r.date + "T00:00:00").getDay()];
+      ctx.fillText(`${dow} ${formatPretty(r.date).replace(",", "")}`, colX.date, y + 16);
 
       let ny = y + 16;
       ctx.font = "600 11.5px Inter, sans-serif";
