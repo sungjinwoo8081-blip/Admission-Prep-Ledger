@@ -9753,6 +9753,15 @@ function App() {
       <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: -1, background: "var(--overlay)", pointerEvents: "none" }} />
 
       {/* glassmorphic side panel — desktop only */}
+      {(() => {
+        const sidebarStreak = computeActivityStreak(subjectsData);
+        const sidebarTodayStr = fmtDate(new Date());
+        const sidebarTodayInfo = calendarData[sidebarTodayStr];
+        const sidebarTodayStarted = !!(sidebarTodayInfo && sidebarTodayInfo.plans && sidebarTodayInfo.plans.some((p) => p.completed));
+        const sidebarTodayHasPlan = !!(sidebarTodayInfo && sidebarTodayInfo.plans && sidebarTodayInfo.plans.length > 0);
+        const avatarRingColor = sidebarTodayStarted ? "#2FA876" : (sidebarTodayHasPlan ? "#E7A100" : "transparent");
+        const activeThemeMeta = THEMES.find((t) => t.id === themeName);
+      return (
       <div className={`glass-sidebar hidden md:flex${sidebarCollapsed ? " collapsed" : ""}`}>
         <div className="sidebar-brand">
           <div className="flex items-center justify-center rounded-lg overflow-hidden" style={{ width: 32, height: 32, background: "var(--accent)", flexShrink: 0 }}>
@@ -9773,6 +9782,7 @@ function App() {
             const Icon = t.icon;
             const active = tab === t.id;
             const showDot = t.id === "community" && hasUnreadChat;
+            const showStreak = t.id === "overview" && sidebarStreak > 0;
             return (
               <button key={t.id} onClick={() => setTab(t.id)} title={sidebarCollapsed ? t.label : undefined}
                 className={`sidebar-item${active ? " active" : ""}`} style={{ position: "relative" }}>
@@ -9785,7 +9795,15 @@ function App() {
                     }} />
                   )}
                 </span>
-                <span className="sidebar-label truncate">{t.label}</span>
+                <span className="sidebar-label truncate flex-1">{t.label}</span>
+                {showStreak && !sidebarCollapsed && (
+                  <span className="sidebar-label flex items-center gap-0.5" style={{
+                    fontSize: 10.5, fontFamily: "JetBrains Mono, monospace", fontWeight: 700,
+                    color: "#E7A100", flexShrink: 0,
+                  }}>
+                    <Flame size={11} color="#E7A100" />{sidebarStreak}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -9794,7 +9812,12 @@ function App() {
         <div className="sidebar-footer">
           <div style={{ position: "relative" }}>
             <div onClick={() => setProfilePopoverOpen((o) => !o)} role="button" tabIndex={0} title={sidebarCollapsed ? (userName || "Profile") : undefined} className="sidebar-item">
-              <Avatar name={userName} photo={userPhoto} size={22} />
+              <span style={{
+                display: "inline-flex", borderRadius: "50%", flexShrink: 0,
+                boxShadow: avatarRingColor !== "transparent" ? `0 0 0 2px ${avatarRingColor}` : "none",
+              }}>
+                <Avatar name={userName} photo={userPhoto} size={22} />
+              </span>
               <span className="sidebar-label truncate">{userName || "Profile"}</span>
             </div>
             {profilePopoverOpen && (
@@ -9823,6 +9846,9 @@ function App() {
               </React.Fragment>
             )}
           </div>
+          {!sidebarCollapsed && (
+            <p className="text-[9.5px] uppercase tracking-wide" style={{ color: "var(--faint)", fontFamily: "JetBrains Mono, monospace", margin: "10px 0 2px", paddingLeft: 4 }}>Settings</p>
+          )}
           <button onClick={() => setGuideOpen(true)} title={sidebarCollapsed ? "How this app works" : undefined} className="sidebar-item">
             <HelpCircle size={19} style={{ flexShrink: 0 }} />
             <span className="sidebar-label truncate">Guide</span>
@@ -9832,7 +9858,13 @@ function App() {
             <span className="sidebar-label truncate">Protocol</span>
           </button>
           <button onClick={() => setSettingsOpen((o) => !o)} title={sidebarCollapsed ? "Appearance settings" : undefined} className="sidebar-item">
-            {dark ? <Sun size={19} style={{ flexShrink: 0 }} /> : <MoonStar size={19} style={{ flexShrink: 0 }} />}
+            {activeThemeMeta ? (
+              <span style={{
+                width: 19, height: 19, borderRadius: 6, flexShrink: 0,
+                background: `linear-gradient(135deg, ${activeThemeMeta.swatch}, ${activeThemeMeta.swatch}99)`,
+                boxShadow: "0 1px 3px rgba(0,0,0,0.25)",
+              }} />
+            ) : (dark ? <Sun size={19} style={{ flexShrink: 0 }} /> : <MoonStar size={19} style={{ flexShrink: 0 }} />)}
             <span className="sidebar-label truncate">Appearance</span>
           </button>
           <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="sidebar-toggle-btn">
@@ -9841,6 +9873,7 @@ function App() {
           </button>
         </div>
       </div>
+      ); })()}
 
       <div className={`main-with-sidebar ${sidebarCollapsed ? "md:ml-[76px]" : "md:ml-[240px]"}`}>
 
