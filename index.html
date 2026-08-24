@@ -785,6 +785,7 @@ const L = (d, extra) => React.createElement("path", { d, ...(extra || {}) });
 const C = (cx, cy, r, extra) => React.createElement("circle", { cx, cy, r, ...(extra || {}) });
 
 const BookOpen = makeIcon([L("M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z", { key: 1 }), L("M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z", { key: 2 })]);
+const SettingsIcon = makeIcon([C(12, 12, 3, { key: 1 }), L("M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z", { key: 2 })]);
 const Video = makeIcon([React.createElement("rect", { x: 2, y: 6, width: 14, height: 12, rx: 2, key: 1 }), L("m22 8-6 4 6 4Z", { key: 2 })]);
 const ClipboardList = makeIcon([React.createElement("rect", { x: 5, y: 4, width: 14, height: 17, rx: 2, key: 1 }), L("M9 3h6v3H9z", { key: 2 }), L("M9 11h6M9 15h6M9 19h3", { key: 3 })]);
 const RotateCcw = makeIcon([L("M3 12a9 9 0 1 0 3-6.7L3 8", { key: 1 }), L("M3 3v5h5", { key: 2 })]);
@@ -8775,6 +8776,7 @@ function App() {
   const [themeName, setThemeNameState] = useState("quartz");
   const [bgImage, setBgImage] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [advSettingsOpen, setAdvSettingsOpen] = useState(false);
   const [syncModal, setSyncModal] = useState(null); // null | "copy" | "paste"
   const [pasteText, setPasteText] = useState("");
   const syncCopyRef = useRef(null);
@@ -9521,7 +9523,7 @@ function App() {
       await saveKey("weekly-plans", {});
       await saveKey("daily-checks", {});
       await saveSettings({ track: "engineering", predictedDates: { engineering: "", medical: "", varsity: "", iba: "" }, officialDates: { engineering: "", medical: "", varsity: "", iba: "" } });
-      setSettingsOpen(false);
+      setAdvSettingsOpen(false);
       alert("All data has been reset.");
     })();
   };
@@ -9857,7 +9859,7 @@ function App() {
             <Lamp size={19} style={{ flexShrink: 0 }} />
             <span className="sidebar-label truncate">Protocol</span>
           </button>
-          <button onClick={() => setSettingsOpen((o) => !o)} title={sidebarCollapsed ? "Appearance settings" : undefined} className="sidebar-item">
+          <button onClick={() => setSettingsOpen((o) => !o)} title={sidebarCollapsed ? "Appearance" : undefined} className="sidebar-item">
             {activeThemeMeta ? (
               <span style={{
                 width: 19, height: 19, borderRadius: 6, flexShrink: 0,
@@ -9866,6 +9868,10 @@ function App() {
               }} />
             ) : (dark ? <Sun size={19} style={{ flexShrink: 0 }} /> : <MoonStar size={19} style={{ flexShrink: 0 }} />)}
             <span className="sidebar-label truncate">Appearance</span>
+          </button>
+          <button onClick={() => setAdvSettingsOpen((o) => !o)} title={sidebarCollapsed ? "Settings" : undefined} className="sidebar-item">
+            <SettingsIcon size={19} style={{ flexShrink: 0 }} />
+            <span className="sidebar-label truncate">Settings</span>
           </button>
           <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="sidebar-toggle-btn">
             {sidebarCollapsed ? <ChevronsRight size={18} style={{ flexShrink: 0 }} /> : <ChevronsLeft size={18} style={{ flexShrink: 0 }} />}
@@ -9905,8 +9911,13 @@ function App() {
           </button>
           <button onClick={() => setSettingsOpen((o) => !o)}
             className="p-2 rounded-full flex items-center justify-center"
-            style={{ background: "var(--surface)", border: "1px solid var(--border)" }} title="Appearance settings">
+            style={{ background: "var(--surface)", border: "1px solid var(--border)" }} title="Appearance">
             {dark ? <Sun size={16} color="var(--on-ink)" /> : <MoonStar size={16} color="var(--on-ink)" />}
+          </button>
+          <button onClick={() => setAdvSettingsOpen((o) => !o)}
+            className="p-2 rounded-full flex items-center justify-center"
+            style={{ background: "var(--surface)", border: "1px solid var(--border)" }} title="Settings">
+            <SettingsIcon size={16} color="var(--on-ink)" />
           </button>
 
           {profilePopoverOpen && (
@@ -10000,8 +10011,25 @@ function App() {
                   </div>
                 </React.Fragment>
               ))}
+          </div>
+        </React.Fragment>
+      )}
 
-              <button onClick={() => { setSettingsOpen(false); setProfileEditOpen(true); }}
+      {advSettingsOpen && (
+        <React.Fragment>
+          <div onClick={() => setAdvSettingsOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 39, background: "transparent" }} />
+          <div className="p-3 rounded-lg"
+            style={{
+              position: "fixed", top: 68, right: 16, zIndex: 40,
+              background: "var(--panel)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
+              border: "1px solid var(--border)",
+              width: "min(270px, calc(100vw - 32px))",
+              maxHeight: "calc(100dvh - 88px)",
+              overflowY: "auto", boxShadow: "0 12px 32px rgba(0,0,0,0.35)"
+            }}>
+              <p className="text-xs mb-1.5" style={{ color: "var(--muted)" }}>Settings</p>
+
+              <button onClick={() => { setAdvSettingsOpen(false); setProfileEditOpen(true); }}
                 className="w-full flex items-center gap-2 text-xs px-2 py-1.5 rounded mb-3"
                 style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
                 <Avatar name={userName} photo={userPhoto} size={26} />
