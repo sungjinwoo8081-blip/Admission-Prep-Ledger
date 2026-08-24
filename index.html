@@ -9883,41 +9883,41 @@ function App() {
 
       <div className={`main-with-sidebar ${sidebarCollapsed ? "md:ml-[76px]" : "md:ml-[240px]"}`}>
 
-      <div style={{ background: "var(--ink-strong)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", position: "relative", zIndex: 25, boxShadow: "0 1px 0 var(--border)" }} className="px-5 py-4 flex items-center justify-between md:hidden">
-        <div className="flex items-center gap-2.5">
-          <div className="flex items-center justify-center rounded-lg overflow-hidden" style={{ width: 34, height: 34, background: "var(--accent)", flexShrink: 0 }}>
+      <div style={{ background: "var(--ink-strong)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", position: "relative", zIndex: 25, boxShadow: "0 1px 0 var(--border)" }} className="px-3 py-3 flex items-center justify-between gap-2 md:hidden">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <div className="flex items-center justify-center rounded-lg overflow-hidden" style={{ width: 30, height: 30, background: "var(--accent)", flexShrink: 0 }}>
             {window.APP_LOGO_URL ? (
               <img src={window.APP_LOGO_URL} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             ) : (
-              <BookOpen size={17} color="var(--on-ink)" />
+              <BookOpen size={15} color="var(--on-ink)" />
             )}
           </div>
-          <div>
-            <p className="app-title" style={{ color: "var(--on-ink)", fontSize: 20, fontWeight: 700, letterSpacing: "-0.01em", lineHeight: 1.15 }}>Admission Prep Ledger</p>
-            <p style={{ color: "var(--muted-on-dark)", fontSize: 11.5, fontFamily: "JetBrains Mono, monospace", letterSpacing: "0.02em" }}>Engineering · Medical · Varsity · IBA</p>
+          <div className="min-w-0 flex-1">
+            <p className="app-title truncate" style={{ color: "var(--on-ink)", fontSize: 16, fontWeight: 700, letterSpacing: "-0.01em", lineHeight: 1.2 }}>Prep Ledger</p>
+            <p className="truncate" style={{ color: "var(--muted-on-dark)", fontSize: 10, fontFamily: "JetBrains Mono, monospace", letterSpacing: "0.02em" }}>Eng · Med · Varsity · IBA</p>
           </div>
         </div>
-        <div className="relative flex items-center gap-2">
-          <Avatar name={userName} photo={userPhoto} size={34} ring={profilePopoverOpen} onClick={() => setProfilePopoverOpen((o) => !o)} />
+        <div className="relative flex items-center gap-1 flex-shrink-0">
+          <Avatar name={userName} photo={userPhoto} size={30} ring={profilePopoverOpen} onClick={() => setProfilePopoverOpen((o) => !o)} />
           <button onClick={() => setGuideOpen(true)}
-            className="p-2 rounded-full flex items-center justify-center"
+            className="p-1.5 rounded-full flex items-center justify-center"
             style={{ background: "var(--surface)", border: "1px solid var(--border)" }} title="How this app works">
-            <HelpCircle size={16} color="var(--on-ink)" />
+            <HelpCircle size={15} color="var(--on-ink)" />
           </button>
           <button onClick={() => setProtocolOpen(true)}
-            className="p-2 rounded-full flex items-center justify-center"
+            className="p-1.5 rounded-full flex items-center justify-center"
             style={{ background: "var(--surface)", border: "1px solid var(--border)" }} title="Study protocol">
-            <Lamp size={16} color="var(--on-ink)" />
+            <Lamp size={15} color="var(--on-ink)" />
           </button>
           <button onClick={() => setSettingsOpen((o) => !o)}
-            className="p-2 rounded-full flex items-center justify-center"
+            className="p-1.5 rounded-full flex items-center justify-center"
             style={{ background: "var(--surface)", border: "1px solid var(--border)" }} title="Appearance">
-            {dark ? <Sun size={16} color="var(--on-ink)" /> : <MoonStar size={16} color="var(--on-ink)" />}
+            {dark ? <Sun size={15} color="var(--on-ink)" /> : <MoonStar size={15} color="var(--on-ink)" />}
           </button>
           <button onClick={() => setAdvSettingsOpen((o) => !o)}
-            className="p-2 rounded-full flex items-center justify-center"
+            className="p-1.5 rounded-full flex items-center justify-center"
             style={{ background: "var(--surface)", border: "1px solid var(--border)" }} title="Settings">
-            <SettingsIcon size={16} color="var(--on-ink)" />
+            <SettingsIcon size={15} color="var(--on-ink)" />
           </button>
 
           {profilePopoverOpen && (
