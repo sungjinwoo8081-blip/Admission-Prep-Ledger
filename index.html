@@ -769,7 +769,7 @@
 
 <script type="text/babel-jsx" id="app-source">
 const React = window.React;
-const { useState, useEffect, useRef, useCallback } = React;
+const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
 /* Minimal local icon set (no external icon-library dependency).
    Each mirrors the small subset of the lucide-react API this app uses:
@@ -6180,326 +6180,649 @@ const ROUTINE_TOUR_STEPS = [
   { target: "[data-tour='rt-list']", title: "পুরো রুটিন লিস্ট", body: "সব রুটিন আইটেম এখানে — প্রতিটাতে এডিট বা ডিলিট করার অপশন আছে (কার্ডের নিজস্ব বাটনে)।" },
 ];
 
-function RoutineTab({ routines, setRoutines, routineChecks, setRoutineChecks, mixedExams, calendarData, track, dark, userName, userPhoto, subjectsData, weeklyPlans, setWeeklyPlans, weekStartDay, loaded }) {
-  const blankForm = { kind: "class", title: "", mode: "offline", note: "", recurring: false, daysOfWeek: [], startDate: "", endDate: "", date: fmtDate(new Date()) };
-  const [form, setForm] = useState(blankForm);
-  const [filterKind, setFilterKind] = useState("all");
-  const [filterMode, setFilterMode] = useState("all");
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
-  const [shareModal, setShareModal] = useState(null); // null | "export" | "import"
-  const [importText, setImportText] = useState("");
-  const shareCopyRef = useRef(null);
-  const [snapOpen, setSnapOpen] = useState(false);
-  const [snapMode, setSnapMode] = useState("calendar"); // "calendar" | "list"
-  const [snapStart, setSnapStart] = useState(fmtDate(new Date()));
-  const [snapEnd, setSnapEnd] = useState(fmtDate(new Date()));
+/* ---------------------------------------------------------------
+   STUDY PLAN WIZARD — replaces the old manual Routine tab.
+   A "routine plan" (state key: routinePlans / "routine-plans") is a
+   4-step wizard (duration → chapters → order → finalize) that auto-
+   generates a day-by-day schedule of blocks. Those generated blocks
+   are converted (in App()) into ordinary `routines` items so the
+   Overview/Calendar tabs render them without any changes.
+   NOTE: this is a different concept from the per-day chapter
+   "study plan" markers used on the Chapters/Calendar tabs — naming
+   collision is UI-label only ("স্টাডি প্ল্যান"), not data-level.
+----------------------------------------------------------------*/
+const RP_DOW_BN = ["রবিবার", "সোমবার", "মঙ্গলবার", "বুধবার", "বৃহস্পতিবার", "শুক্রবার", "শনিবার"];
+const RP_MONTH_BN = ["জানু", "ফেব্রু", "মার্চ", "এপ্রিল", "মে", "জুন", "জুলাই", "আগ", "সেপ্ট", "অক্টো", "নভে", "ডিসে"];
+const RP_DURATIONS = [15, 30, 45, 60, 90, 120];
+const RP_MODES = [
+  { id: "balanced", bn: "ব্যালান্সড" },
+  { id: "intensified", bn: "ইনটেনসিফাইড" },
+  { id: "relaxed", bn: "রিল্যাক্সড" },
+  { id: "examSprint", bn: "পরীক্ষা স্প্রিন্ট" },
+  { id: "weakness", bn: "দুর্বলতা কুইকফিক্স" },
+  { id: "revisionOnly", bn: "শুধু রিভিশন" },
+  { id: "backlog", bn: "ব্যাকলগ" },
+];
+const RP_CONTENT_TYPES = [
+  { id: "recorded", bn: "রেকর্ডেড" },
+  { id: "live", bn: "লাইভ" },
+  { id: "notes", bn: "নোট" },
+  { id: "quiz", bn: "কুইজ" },
+  { id: "mcq", bn: "এমসিকিউ" },
+  { id: "cq", bn: "সিকিউ" },
+  { id: "mock", bn: "মক" },
+];
+const RP_VISIBILITY = [
+  { id: "private", bn: "শুধু আমি (প্রাইভেট)" },
+  { id: "link", bn: "লিংক যাদের আছে" },
+  { id: "public", bn: "সবাই (পাবলিক)" },
+];
+const RP_BLOCK_LABELS = { recorded: "রেকর্ডেড", live: "লাইভ", notes: "নোট", quiz: "কুইজ", mcq: "এমসিকিউ", cq: "সিকিউ", mock: "মক", revision: "রিভিশন", buffer: "ক্যাচ-আপ/বাফার" };
 
+function rpBnDateLabel(dateStr) {
+  const d = new Date(dateStr + "T00:00:00");
+  return `${d.getDate()} ${RP_MONTH_BN[d.getMonth()]}`;
+}
+
+function rpChapterLabel(subjectId, chapterId) {
+  const subj = SUBJECTS.find((s) => s.id === subjectId);
+  const chap = subj?.chapters.find((c) => c.id === chapterId);
+  return chap ? (chap.bn || chap.en) : "";
+}
+
+function rpDailyMinutes(plan, dow) {
+  const w = plan.dailyWindows?.[dow];
+  if (!w || !w.on || !w.blocks?.length) return 0;
+  return w.blocks.reduce((sum, b) => {
+    const [sh, sm] = b.start.split(":").map(Number);
+    const [eh, em] = b.end.split(":").map(Number);
+    return sum + Math.max(0, (eh * 60 + em) - (sh * 60 + sm));
+  }, 0);
+}
+function rpFirstStart(plan, dow) {
+  const w = plan.dailyWindows?.[dow];
+  return (w && w.on && w.blocks?.length) ? w.blocks[0].start : null;
+}
+function rpAddMinutes(t, mins) {
+  const [h, m] = t.split(":").map(Number);
+  const total = ((h * 60 + m + mins) % 1440 + 1440) % 1440;
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+function rpWeeklyHours(plan) {
+  let mins = 0;
+  for (let d = 0; d < 7; d++) mins += rpDailyMinutes(plan, d);
+  return Math.round((mins / 60) * 10) / 10;
+}
+
+// Builds the day-by-day generated schedule for a plan. Pure function — recomputed on read.
+function generateRoutinePlanSchedule(plan) {
+  const chapters = plan.chapters || [];
+  if (!chapters.length || !plan.startDate || !plan.endDate) return [];
+
+  const activeDates = [];
+  let cursor = plan.startDate;
+  let guard = 0;
+  while (cursor <= plan.endDate && guard < 400) {
+    const dow = new Date(cursor + "T00:00:00").getDay();
+    if (!(plan.skipDates || []).includes(cursor) && rpDailyMinutes(plan, dow) > 0) {
+      activeDates.push(cursor);
+    }
+    cursor = dateAddDays(cursor, 1);
+    guard++;
+  }
+  if (!activeDates.length) return [];
+
+  const mode = plan.mode || "balanced";
+  const content = plan.contentTypes || {};
+  const days = activeDates.map((date) => ({ date, dow: new Date(date + "T00:00:00").getDay(), blocks: [] }));
+  const doRevisionOnly = mode === "revisionOnly" || mode === "weakness";
+
+  const passOrder = [];
+  if (!doRevisionOnly) {
+    let chapterCursor = 0, dayIdx = 0;
+    while (chapterCursor < chapters.length && dayIdx < days.length) {
+      const assignToday = mode === "relaxed" ? (dayIdx % 2 === 0) : true;
+      if (assignToday) {
+        const count = mode === "intensified" ? 2 : 1;
+        for (let k = 0; k < count && chapterCursor < chapters.length; k++) {
+          passOrder.push({ dayIdx, chapterIdx: chapterCursor });
+          chapterCursor++;
+        }
+      }
+      dayIdx++;
+    }
+    // backlog / examSprint: compress leftovers onto the last used day rather than losing them
+    while (chapterCursor < chapters.length) {
+      passOrder.push({ dayIdx: Math.max(0, days.length - 1), chapterIdx: chapterCursor });
+      chapterCursor++;
+    }
+  }
+
+  passOrder.forEach(({ dayIdx, chapterIdx }) => {
+    const day = days[dayIdx];
+    if (!day) return;
+    const ch = chapters[chapterIdx];
+    const startTime = rpFirstStart(plan, day.dow) || "18:00";
+    const totalMin = rpDailyMinutes(plan, day.dow) || 60;
+    const divisor = mode === "intensified" ? 2 : 1;
+    const mainMin = Math.max(20, Math.round((totalMin * 0.7) / divisor));
+    const notesMin = Math.max(10, Math.min(20, totalMin - mainMin));
+    let t = startTime;
+    if (content.recorded !== false) {
+      day.blocks.push({ id: uid(), time: t, endTime: rpAddMinutes(t, mainMin), type: "recorded", subjectId: ch.subjectId, chapterId: ch.chapterId });
+      t = rpAddMinutes(t, mainMin);
+    }
+    if (content.notes !== false) {
+      day.blocks.push({ id: uid(), time: t, endTime: rpAddMinutes(t, notesMin), type: "notes", subjectId: ch.subjectId, chapterId: ch.chapterId });
+    }
+  });
+
+  const lastMainDay = passOrder.length ? Math.max(...passOrder.map((p) => p.dayIdx)) : -1;
+  let revCursor = lastMainDay + 1;
+  const revisionTargets = doRevisionOnly ? chapters.map((c, i) => i) : [...new Set(passOrder.map((p) => p.chapterIdx))];
+  revisionTargets.forEach((chapterIdx) => {
+    while (revCursor < days.length && days[revCursor].blocks.length > 0) revCursor++;
+    const day = days[revCursor];
+    if (!day) return;
+    const ch = chapters[chapterIdx];
+    const startTime = rpFirstStart(plan, day.dow) || "18:00";
+    const revMin = Math.max(15, Math.min(30, rpDailyMinutes(plan, day.dow) || 25));
+    day.blocks.push({ id: uid(), time: startTime, endTime: rpAddMinutes(startTime, revMin), type: "revision", subjectId: ch.subjectId, chapterId: ch.chapterId });
+    revCursor++;
+  });
+
+  days.forEach((day) => {
+    if (day.blocks.length === 0 && rpDailyMinutes(plan, day.dow) > 0) {
+      const startTime = rpFirstStart(plan, day.dow) || "18:00";
+      const bufMin = Math.max(15, Math.min(30, rpDailyMinutes(plan, day.dow)));
+      day.blocks.push({ id: uid(), time: startTime, endTime: rpAddMinutes(startTime, bufMin), type: "buffer" });
+    }
+    day.blocks.sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : 0));
+  });
+
+  return days;
+}
+
+const RP_BLANK_WINDOWS = () => {
+  const w = {};
+  for (let d = 0; d < 7; d++) w[d] = { on: true, blocks: [{ start: "18:00", end: "23:00" }] };
+  return w;
+};
+
+function blankRoutinePlan() {
   const today = fmtDate(new Date());
-  const todaysItems = routineItemsForDate(routines, today);
+  return {
+    id: uid(), name: "", startDate: today, endDate: dateAddDays(today, 14),
+    dailyWindows: RP_BLANK_WINDOWS(), skipDates: [],
+    chapters: [], mode: "balanced",
+    contentTypes: { recorded: true, live: true, notes: true, quiz: true, mcq: true, cq: true, mock: true },
+    visibility: "private", leaderboard: false, createdAt: Date.now(),
+  };
+}
+
+function RoutinePlanWizard({ draft, setDraft, track, onCancel, onFinish }) {
+  const [step, setStep] = useState(1);
+  const [skipInput, setSkipInput] = useState("");
+
+  const weeklyHrs = rpWeeklyHours(draft);
+  const schedulePreview = step === 4 ? generateRoutinePlanSchedule(draft) : [];
+
+  const setDur = (n) => setDraft((d) => ({ ...d, endDate: dateAddDays(d.startDate, n - 1) }));
+  const durSelected = (() => {
+    const days = Math.round((new Date(draft.endDate) - new Date(draft.startDate)) / 86400000) + 1;
+    return RP_DURATIONS.includes(days) ? days : null;
+  })();
+
+  const toggleDayOn = (dow) => setDraft((d) => ({ ...d, dailyWindows: { ...d.dailyWindows, [dow]: { ...d.dailyWindows[dow], on: !d.dailyWindows[dow].on } } }));
+  const setDayBlock = (dow, idx, key, val) => setDraft((d) => {
+    const blocks = [...d.dailyWindows[dow].blocks];
+    blocks[idx] = { ...blocks[idx], [key]: val };
+    return { ...d, dailyWindows: { ...d.dailyWindows, [dow]: { ...d.dailyWindows[dow], blocks } } };
+  });
+  const addDayBlock = (dow) => setDraft((d) => ({ ...d, dailyWindows: { ...d.dailyWindows, [dow]: { ...d.dailyWindows[dow], blocks: [...d.dailyWindows[dow].blocks, { start: "18:00", end: "19:00" }] } } }));
+
+  const addSkip = () => {
+    if (!skipInput) return;
+    setDraft((d) => ({ ...d, skipDates: [...new Set([...(d.skipDates || []), skipInput])].sort() }));
+    setSkipInput("");
+  };
+  const removeSkip = (ds) => setDraft((d) => ({ ...d, skipDates: d.skipDates.filter((x) => x !== ds) }));
+
+  const visibleSubjects = trackVisibleSubjects(track || "engineering");
+  const chapterKey = (subjectId, chapterId) => `${subjectId}::${chapterId}`;
+  const selectedSet = new Set((draft.chapters || []).map((c) => chapterKey(c.subjectId, c.chapterId)));
+  const [expanded, setExpanded] = useState({});
+
+  const toggleChapter = (subjectId, chapterId) => setDraft((d) => {
+    const k = chapterKey(subjectId, chapterId);
+    const exists = (d.chapters || []).some((c) => chapterKey(c.subjectId, c.chapterId) === k);
+    return { ...d, chapters: exists ? d.chapters.filter((c) => chapterKey(c.subjectId, c.chapterId) !== k) : [...d.chapters, { subjectId, chapterId }] };
+  });
+  const toggleAllInSubject = (subj) => setDraft((d) => {
+    const allIn = subj.chapters.every((c) => (d.chapters || []).some((x) => x.subjectId === subj.id && x.chapterId === c.id));
+    if (allIn) return { ...d, chapters: d.chapters.filter((c) => c.subjectId !== subj.id) };
+    const withoutThis = d.chapters.filter((c) => c.subjectId !== subj.id);
+    return { ...d, chapters: [...withoutThis, ...subj.chapters.map((c) => ({ subjectId: subj.id, chapterId: c.id }))] };
+  });
+
+  const moveChapter = (idx, dir) => setDraft((d) => {
+    const arr = [...d.chapters];
+    const j = idx + dir;
+    if (j < 0 || j >= arr.length) return d;
+    [arr[idx], arr[j]] = [arr[j], arr[idx]];
+    return { ...d, chapters: arr };
+  });
+  const removeChapterAt = (idx) => setDraft((d) => ({ ...d, chapters: d.chapters.filter((_, i) => i !== idx) }));
+
+  const stepLabels = ["সময়সীমা", "অধ্যায়", "সাজাও", "চূড়ান্ত"];
+
+  return (
+    <div className="p-4 rounded-lg" style={{ background: "var(--panel)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", border: "1px solid var(--divider)" }}>
+      <div className="flex items-center justify-center gap-2 mb-4 flex-wrap">
+        {stepLabels.map((label, i) => (
+          <React.Fragment key={i}>
+            <div className="flex items-center gap-1.5">
+              <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: step >= i + 1 ? "var(--ink-strong)" : "var(--surface)", color: step >= i + 1 ? "var(--on-ink)" : "var(--muted)", border: "1px solid var(--border)" }}>{i + 1}</span>
+              <span className="text-xs font-semibold" style={{ color: step === i + 1 ? "var(--ink)" : "var(--faint)" }}>{label}</span>
+            </div>
+            {i < stepLabels.length - 1 && <span style={{ color: "var(--border)" }}>──</span>}
+          </React.Fragment>
+        ))}
+      </div>
+
+      {step === 1 && (
+        <div>
+          <p className="text-sm font-bold mb-1" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>স্টাডি প্ল্যানের সময়সীমা</p>
+          <p className="text-xs mb-3" style={{ color: "var(--faint)" }}>কত সময় আর সপ্তাহে কত ঘণ্টা পড়বে — সেট করো।</p>
+          <label className="text-xs block mb-1" style={{ color: "var(--muted)" }}>প্ল্যানের নাম</label>
+          <TinyInput value={draft.name} onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))} placeholder="যেমন: BUET Sprint" className="w-full mb-3" />
+          <div className="flex gap-3 mb-3 flex-wrap">
+            <label className="text-xs" style={{ color: "var(--muted)" }}>শুরুর তারিখ
+              <TinyInput type="date" value={draft.startDate} onChange={(e) => setDraft((d) => ({ ...d, startDate: e.target.value }))} style={{ display: "block", marginTop: 2 }} />
+            </label>
+            <label className="text-xs" style={{ color: "var(--muted)" }}>পরীক্ষা / শেষ তারিখ
+              <TinyInput type="date" value={draft.endDate} onChange={(e) => setDraft((d) => ({ ...d, endDate: e.target.value }))} style={{ display: "block", marginTop: 2 }} />
+            </label>
+          </div>
+          <p className="text-xs mb-1" style={{ color: "var(--muted)" }}>দ্রুত নির্বাচন:</p>
+          <div className="flex gap-1.5 mb-4 flex-wrap">
+            {RP_DURATIONS.map((n) => (
+              <button key={n} onClick={() => setDur(n)} className="text-xs font-semibold px-3 py-1 rounded-full"
+                style={{ background: durSelected === n ? "var(--ink-strong)" : "var(--surface)", color: durSelected === n ? "var(--on-ink)" : "var(--ink-soft)", border: "1px solid var(--border)" }}>
+                {n >= 120 ? "৪ মাস" : `${n} দিন`}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold" style={{ color: "var(--ink)" }}>🕐 প্রতিদিন কখন পড়বে</p>
+            <p className="text-xs font-bold" style={{ color: "var(--accent)" }}>সপ্তাহে মোট {weeklyHrs} Hr</p>
+          </div>
+          <p className="text-xs mb-2" style={{ color: "var(--faint)" }}>স্কুল/কোচিং বাদে যে সময়টুকু নিজে পড়তে পারবে সেটাই দাও।</p>
+          <div className="space-y-2 mb-4">
+            {[0, 1, 2, 3, 4, 5, 6].map((dow) => (
+              <div key={dow} className="p-2.5 rounded-lg" style={{ border: "1px solid var(--border)" }}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="flex items-center gap-2 text-xs font-semibold" style={{ color: "var(--ink)" }}>
+                    <input type="checkbox" checked={draft.dailyWindows[dow].on} onChange={() => toggleDayOn(dow)} />
+                    {RP_DOW_BN[dow]}
+                  </label>
+                  <span className="text-xs font-bold" style={{ color: "var(--accent)" }}>{(rpDailyMinutes(draft, dow) / 60).toFixed(1)} Hr</span>
+                </div>
+                {draft.dailyWindows[dow].on && draft.dailyWindows[dow].blocks.map((b, i) => (
+                  <div key={i} className="flex items-center gap-2 mb-1">
+                    <TinyInput type="time" value={b.start} onChange={(e) => setDayBlock(dow, i, "start", e.target.value)} />
+                    <span style={{ color: "var(--faint)" }}>–</span>
+                    <TinyInput type="time" value={b.end} onChange={(e) => setDayBlock(dow, i, "end", e.target.value)} />
+                  </div>
+                ))}
+                {draft.dailyWindows[dow].on && (
+                  <button onClick={() => addDayBlock(dow)} className="text-xs font-semibold" style={{ color: "var(--accent)" }}>+ আরেকটি সময়</button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <p className="text-xs font-semibold mb-1" style={{ color: "var(--ink)" }}>🚫 বন্ধ দিন বাদ দাও</p>
+          <p className="text-xs mb-2" style={{ color: "var(--faint)" }}>কোনো দিন বাদ থাকলে সেই তারিখ বাদ দাও — ওই দিন কোনো পড়া রাখা হবে না।</p>
+          <div className="flex gap-2 mb-2">
+            <TinyInput type="date" value={skipInput} onChange={(e) => setSkipInput(e.target.value)} />
+            <button onClick={addSkip} className="text-xs font-semibold px-2.5 py-1.5 rounded" style={{ border: "1px solid var(--border)" }}>যোগ করো</button>
+          </div>
+          <div className="flex gap-1.5 flex-wrap mb-4">
+            {(draft.skipDates || []).map((ds) => (
+              <span key={ds} className="text-xs px-2 py-1 rounded-full flex items-center gap-1" style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--ink-soft)" }}>
+                {rpBnDateLabel(ds)} <button onClick={() => removeSkip(ds)}><X size={10} /></button>
+              </span>
+            ))}
+          </div>
+
+          <div className="flex justify-between">
+            <button onClick={onCancel} className="text-sm font-semibold px-3 py-1.5 rounded" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>বাতিল</button>
+            <button onClick={() => setStep(2)} disabled={!draft.name.trim()} className="text-sm font-semibold px-4 py-1.5 rounded" style={{ background: "var(--ink-strong)", color: "var(--on-ink)", opacity: draft.name.trim() ? 1 : 0.5 }}>পরবর্তী: অধ্যায় বাছাই</button>
+          </div>
+        </div>
+      )}
+
+      {step === 2 && (
+        <div>
+          <p className="text-sm font-bold mb-1" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>অধ্যায় নির্বাচন করো</p>
+          <p className="text-xs mb-3" style={{ color: "var(--faint)" }}>তোমার সিলেবাস থেকে — <b>{(draft.chapters || []).length}টি</b> অধ্যায় বাছাই করা হয়েছে।</p>
+          <div className="space-y-2 mb-4">
+            {visibleSubjects.map((subj) => {
+              const allIn = subj.chapters.every((c) => selectedSet.has(chapterKey(subj.id, c.id)));
+              const isOpen = !!expanded[subj.id];
+              return (
+                <div key={subj.id} className="rounded-lg" style={{ border: "1px solid var(--border)" }}>
+                  <div className="flex items-center justify-between p-2.5">
+                    <button onClick={() => setExpanded((e) => ({ ...e, [subj.id]: !isOpen }))} className="text-xs font-semibold flex items-center gap-1" style={{ color: "var(--ink)" }}>
+                      {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />} {subj.name} ({subj.chapters.filter((c) => selectedSet.has(chapterKey(subj.id, c.id))).length})
+                    </button>
+                    <button onClick={() => toggleAllInSubject(subj)} className="text-xs font-semibold" style={{ color: allIn ? "var(--accent)" : "var(--muted)" }}>{allIn ? "সব বাদ দাও" : "সব বাছাই"}</button>
+                  </div>
+                  {isOpen && (
+                    <div className="px-2.5 pb-2.5 space-y-1">
+                      {subj.chapters.map((c) => (
+                        <label key={c.id} className="flex items-center gap-2 text-xs py-0.5" style={{ color: "var(--ink-soft)" }}>
+                          <input type="checkbox" checked={selectedSet.has(chapterKey(subj.id, c.id))} onChange={() => toggleChapter(subj.id, c.id)} />
+                          {c.bn || c.en}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex justify-between">
+            <button onClick={() => setStep(1)} className="text-sm font-semibold px-3 py-1.5 rounded" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>পেছনে</button>
+            <button onClick={() => setStep(3)} disabled={!(draft.chapters || []).length} className="text-sm font-semibold px-4 py-1.5 rounded" style={{ background: "var(--ink-strong)", color: "var(--on-ink)", opacity: (draft.chapters || []).length ? 1 : 0.5 }}>পরবর্তী: সাজাও</button>
+          </div>
+        </div>
+      )}
+
+      {step === 3 && (
+        <div>
+          <p className="text-sm font-bold mb-1" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>⠿ অধ্যায় সাজাও</p>
+          <p className="text-xs mb-3" style={{ color: "var(--faint)" }}>যে ক্রমে পড়তে চাও সেই অনুযায়ী সাজাও — উপরের অধ্যায় আগে পড়ানো হবে।</p>
+          <div className="space-y-2 mb-4">
+            {(draft.chapters || []).map((c, i) => (
+              <div key={i} className="p-2.5 rounded-lg flex items-center justify-between" style={{ border: "1px solid var(--border)" }}>
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0" style={{ background: "var(--accent)", color: "var(--on-ink)" }}>{i + 1}</span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold truncate" style={{ color: "var(--ink)" }}>{rpChapterLabel(c.subjectId, c.chapterId)}</p>
+                    <p className="text-xs" style={{ color: "var(--faint)" }}>{SUBJECTS.find((s) => s.id === c.subjectId)?.short}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <IconBtn onClick={() => moveChapter(i, -1)} title="উপরে"><ChevronDown size={14} style={{ transform: "rotate(180deg)" }} /></IconBtn>
+                  <IconBtn onClick={() => moveChapter(i, 1)} title="নিচে"><ChevronDown size={14} /></IconBtn>
+                  <IconBtn onClick={() => removeChapterAt(i)} title="বাদ দাও"><Trash2 size={14} /></IconBtn>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-between">
+            <button onClick={() => setStep(2)} className="text-sm font-semibold px-3 py-1.5 rounded" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>পেছনে</button>
+            <button onClick={() => setStep(4)} className="text-sm font-semibold px-4 py-1.5 rounded" style={{ background: "var(--ink-strong)", color: "var(--on-ink)" }}>পরবর্তী: চূড়ান্ত</button>
+          </div>
+        </div>
+      )}
+
+      {step === 4 && (
+        <div>
+          <p className="text-sm font-bold mb-1" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>চূড়ান্ত করো</p>
+          <p className="text-xs mb-3" style={{ color: "var(--faint)" }}>মোড আর কনটেন্ট ঠিক করে রুটিন তৈরি করো।</p>
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <div>
+              <label className="text-xs block mb-1" style={{ color: "var(--muted)" }}>পড়ার ধরন (মোড)</label>
+              <select value={draft.mode} onChange={(e) => setDraft((d) => ({ ...d, mode: e.target.value }))} className="w-full text-xs rounded border px-2 py-1.5 tk-field" style={{ borderColor: "var(--border)" }}>
+                {RP_MODES.map((m) => <option key={m.id} value={m.id}>{m.bn}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs block mb-1" style={{ color: "var(--muted)" }}>কে দেখতে পাবে</label>
+              <select value={draft.visibility} onChange={(e) => setDraft((d) => ({ ...d, visibility: e.target.value }))} className="w-full text-xs rounded border px-2 py-1.5 tk-field" style={{ borderColor: "var(--border)" }}>
+                {RP_VISIBILITY.map((v) => <option key={v.id} value={v.id}>{v.bn}</option>)}
+              </select>
+            </div>
+          </div>
+          <p className="text-xs font-semibold mb-1.5" style={{ color: "var(--ink)" }}>কনটেন্টের ধরন</p>
+          <div className="flex gap-3 flex-wrap mb-4">
+            {RP_CONTENT_TYPES.map((ct) => (
+              <label key={ct.id} className="flex items-center gap-1 text-xs" style={{ color: "var(--ink-soft)" }}>
+                <input type="checkbox" checked={draft.contentTypes[ct.id] !== false} onChange={(e) => setDraft((d) => ({ ...d, contentTypes: { ...d.contentTypes, [ct.id]: e.target.checked } }))} />
+                {ct.bn}
+              </label>
+            ))}
+          </div>
+
+          <div className="rounded-lg mb-4" style={{ border: "1px solid var(--border)", maxHeight: 260, overflowY: "auto" }}>
+            {schedulePreview.length === 0 && <p className="text-xs p-3" style={{ color: "var(--faint)" }}>প্রিভিউ তৈরি করতে অন্তত একটা অধ্যায় ও বৈধ সময়সীমা লাগবে।</p>}
+            {schedulePreview.map((day) => (
+              <div key={day.date} className="px-3 py-2" style={{ borderBottom: "1px solid var(--border)" }}>
+                <p className="text-xs font-bold mb-1" style={{ color: "var(--ink)" }}>{RP_DOW_BN[day.dow]} {rpBnDateLabel(day.date)}</p>
+                {day.blocks.map((b) => (
+                  <p key={b.id} className="text-xs" style={{ color: "var(--ink-soft)" }}>
+                    {b.time}–{b.endTime} <span style={{ color: "var(--accent)" }}>{RP_BLOCK_LABELS[b.type]}</span>{b.subjectId ? ` · ${rpChapterLabel(b.subjectId, b.chapterId)}` : ""}
+                  </p>
+                ))}
+              </div>
+            ))}
+          </div>
+
+          <div className="flex justify-between">
+            <button onClick={() => setStep(3)} className="text-sm font-semibold px-3 py-1.5 rounded" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>পেছনে</button>
+            <button onClick={() => onFinish(draft)} className="text-sm font-semibold px-4 py-1.5 rounded" style={{ background: "#1F8A3B", color: "#fff" }}>প্ল্যান তৈরি করো</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RoutinePlanDashboard({ plan, routineChecks, toggleCheck, onBack, onEdit, onDelete }) {
+  const [tab, setTabState] = useState("progress"); // "full" | "progress" | "leaderboard"
+  const schedule = generateRoutinePlanSchedule(plan);
+  const today = fmtDate(new Date());
+  const allBlocks = schedule.flatMap((day) => day.blocks.map((b) => ({ ...b, date: day.date })));
+  const idFor = (b) => `rp-${plan.id}-${b.id}`;
+  const isChecked = (b) => !!(routineChecks[b.date] || {})[idFor(b)];
+
+  const todayBlocks = schedule.find((d) => d.date === today)?.blocks || [];
+  const doneToday = todayBlocks.filter((b) => isChecked(b)).length;
+
+  const nextBlock = allBlocks.filter((b) => b.date >= today && !isChecked(b)).sort((a, b) => (a.date + a.time) < (b.date + b.time) ? -1 : 1)[0];
+
+  const chapterProgress = (plan.chapters || []).map((c) => {
+    const blocks = allBlocks.filter((b) => b.subjectId === c.subjectId && b.chapterId === c.chapterId);
+    const done = blocks.filter((b) => isChecked(b)).length;
+    return { ...c, total: blocks.length, done, pct: blocks.length ? Math.round((done / blocks.length) * 100) : 0 };
+  });
+
+  const totalBlocks = allBlocks.length;
+  const totalDone = allBlocks.filter((b) => isChecked(b)).length;
+  const daysLeft = Math.max(0, Math.round((new Date(plan.endDate) - new Date(today)) / 86400000));
+
+  // simple streak: consecutive fully-completed days walking back from yesterday
+  let streak = 0;
+  for (let i = schedule.length - 1; i >= 0; i--) {
+    const day = schedule[i];
+    if (day.date >= today) continue;
+    if (day.blocks.length && day.blocks.every((b) => isChecked(b))) streak++;
+    else break;
+  }
+
+  return (
+    <div>
+      <button onClick={onBack} className="text-xs font-semibold mb-3 flex items-center gap-1" style={{ color: "var(--accent)" }}><ArrowLeft size={13} /> সব প্ল্যান</button>
+
+      <div className="grid md:grid-cols-2 gap-4 mb-4">
+        <div className="p-3 rounded-lg" style={{ background: "var(--panel)", border: "1px solid var(--divider)" }}>
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs font-bold" style={{ color: "var(--ink)" }}>আজকের লক্ষ্য</p>
+            <p className="text-xs" style={{ color: "var(--faint)" }}>{doneToday}/{todayBlocks.length} শেষ</p>
+          </div>
+          {nextBlock ? (
+            <p className="text-xs mb-2" style={{ color: "var(--faint)" }}>পরবর্তী · {RP_DOW_BN[new Date(nextBlock.date + "T00:00:00").getDay()]} {rpBnDateLabel(nextBlock.date)} — {nextBlock.time} {RP_BLOCK_LABELS[nextBlock.type]}{nextBlock.subjectId ? ` · ${rpChapterLabel(nextBlock.subjectId, nextBlock.chapterId)}` : ""}</p>
+          ) : <p className="text-xs mb-2" style={{ color: "var(--faint)" }}>সব শেষ! 🎉</p>}
+          <div className="space-y-1.5">
+            {todayBlocks.map((b) => (
+              <label key={b.id} className="flex items-center gap-2 text-xs p-1.5 rounded" style={{ background: "var(--surface)" }}>
+                <input type="checkbox" checked={isChecked(b)} onChange={() => toggleCheck(b.date, idFor(b))} />
+                <span style={{ color: "var(--ink-soft)" }}>{b.time}–{b.endTime} · {RP_BLOCK_LABELS[b.type]}{b.subjectId ? ` · ${rpChapterLabel(b.subjectId, b.chapterId)}` : ""}</span>
+              </label>
+            ))}
+            {todayBlocks.length === 0 && <p className="text-xs" style={{ color: "var(--faint)" }}>আজ কিছু শিডিউল করা নেই।</p>}
+          </div>
+        </div>
+
+        <div className="p-3 rounded-lg" style={{ background: "var(--panel)", border: "1px solid var(--divider)" }}>
+          <div className="flex gap-2 mb-3">
+            {[["full", "পূর্ণ রুটিন"], ["progress", "অগ্রগতি"], ["leaderboard", "লিডারবোর্ড"]].map(([id, label]) => (
+              <button key={id} onClick={() => setTabState(id)} className="text-xs font-semibold px-2.5 py-1 rounded-full"
+                style={{ background: tab === id ? "#1F8A3B" : "var(--surface)", color: tab === id ? "#fff" : "var(--muted)", border: "1px solid var(--border)" }}>{label}</button>
+            ))}
+          </div>
+          {tab === "progress" && (
+            <div>
+              <div className="flex gap-2 mb-3">
+                <div className="flex-1 text-center p-2 rounded" style={{ background: "var(--surface)" }}><p className="text-sm font-bold" style={{ color: "var(--ink)" }}>🔥 {streak}</p><p className="text-xs" style={{ color: "var(--faint)" }}>দিন স্ট্রিক</p></div>
+                <div className="flex-1 text-center p-2 rounded" style={{ background: "var(--surface)" }}><p className="text-sm font-bold" style={{ color: "var(--ink)" }}>{totalDone}/{totalBlocks}</p><p className="text-xs" style={{ color: "var(--faint)" }}>ব্লক শেষ</p></div>
+                <div className="flex-1 text-center p-2 rounded" style={{ background: "var(--surface)" }}><p className="text-sm font-bold" style={{ color: "var(--ink)" }}>{daysLeft}</p><p className="text-xs" style={{ color: "var(--faint)" }}>দিন বাকি</p></div>
+              </div>
+              <p className="text-xs font-semibold mb-1.5" style={{ color: "var(--ink)" }}>অধ্যায়ভিত্তিক অগ্রগতি</p>
+              <div className="space-y-1.5">
+                {chapterProgress.map((c, i) => (
+                  <div key={i} className="flex items-center justify-between text-xs p-1.5 rounded" style={{ background: "var(--surface)" }}>
+                    <span style={{ color: "var(--ink-soft)" }}>{rpChapterLabel(c.subjectId, c.chapterId)}</span>
+                    <span className="font-bold" style={{ color: "var(--accent)" }}>{c.pct}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {tab === "full" && (
+            <div style={{ maxHeight: 220, overflowY: "auto" }}>
+              {schedule.map((day) => (
+                <div key={day.date} className="mb-2">
+                  <p className="text-xs font-bold" style={{ color: "var(--ink)" }}>{RP_DOW_BN[day.dow]} {rpBnDateLabel(day.date)}</p>
+                  {day.blocks.map((b) => (
+                    <p key={b.id} className="text-xs pl-2" style={{ color: isChecked(b) ? "var(--faint)" : "var(--ink-soft)", textDecoration: isChecked(b) ? "line-through" : "none" }}>
+                      {b.time}–{b.endTime} {RP_BLOCK_LABELS[b.type]}{b.subjectId ? ` · ${rpChapterLabel(b.subjectId, b.chapterId)}` : ""}
+                    </p>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+          {tab === "leaderboard" && <p className="text-xs" style={{ color: "var(--faint)" }}>এই ফিচার শীঘ্রই আসছে।</p>}
+        </div>
+      </div>
+
+      <div className="p-3 rounded-lg" style={{ background: "var(--panel)", border: "1px solid var(--divider)" }}>
+        <p className="text-sm font-bold" style={{ color: "var(--ink)" }}>{plan.name}</p>
+        <p className="text-xs mb-2" style={{ color: "var(--faint)" }}>{totalDone}/{totalBlocks} রিসোর্স সম্পন্ন</p>
+        <div className="flex gap-2 flex-wrap">
+          <button onClick={onEdit} className="text-xs font-semibold px-2.5 py-1.5 rounded" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>রুটিন পরিবর্তন</button>
+          <button onClick={onDelete} className="text-xs font-semibold px-2.5 py-1.5 rounded" style={{ border: "1px solid #A5473A", color: "#A5473A" }}>ডিলিট</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RoutineTab({ routinePlans, setRoutinePlans, routineChecks, setRoutineChecks, dark, userName, userPhoto, subjectsData, weeklyPlans, setWeeklyPlans, weekStartDay, loaded, mixedExams, track }) {
+  const [mode, setMode] = useState("list"); // "list" | "wizard" | "dashboard"
+  const [draft, setDraft] = useState(null);
+  const [activePlanId, setActivePlanId] = useState(null);
 
   const toggleCheck = (dateStr, id) => {
     setRoutineChecks({ ...routineChecks, [dateStr]: { ...(routineChecks[dateStr] || {}), [id]: !(routineChecks[dateStr] || {})[id] } });
   };
 
-  const resetForm = () => setForm(blankForm);
-
-  const setSnapWeek = () => {
-    const t = new Date();
-    const dow = t.getDay();
-    setSnapStart(dateAddDays(fmtDate(t), -dow));
-    setSnapEnd(dateAddDays(fmtDate(t), 6 - dow));
+  const startNew = () => { setDraft(blankRoutinePlan()); setMode("wizard"); };
+  const startEdit = (plan) => { setDraft({ ...plan }); setMode("wizard"); };
+  const cancelWizard = () => { setDraft(null); setMode(activePlanId ? "dashboard" : "list"); };
+  const finishWizard = (finalDraft) => {
+    const exists = routinePlans.some((p) => p.id === finalDraft.id);
+    setRoutinePlans(exists ? routinePlans.map((p) => (p.id === finalDraft.id ? finalDraft : p)) : [finalDraft, ...routinePlans]);
+    setActivePlanId(finalDraft.id);
+    setDraft(null);
+    setMode("dashboard");
   };
-  const setSnapMonth = () => {
-    const t = new Date();
-    setSnapStart(fmtDate(new Date(t.getFullYear(), t.getMonth(), 1)));
-    setSnapEnd(fmtDate(new Date(t.getFullYear(), t.getMonth() + 1, 0)));
-  };
-  const setSnapToday = () => {
-    const t = fmtDate(new Date());
-    setSnapStart(t);
-    setSnapEnd(t);
-  };
-  const doSnap = () => {
-    if (snapStart > snapEnd) { alert("Start date is after end date — swap them and try again."); return; }
-    if (dateAddDays(snapEnd, 1) > dateAddDays(snapStart, 62)) { alert("That's a big range — pick something under about 2 months so the image stays readable."); return; }
-    const suffix = snapMode === "list" ? "Routine (detailed)" : "Routine";
-    const label = personalizedSnapLabel(userName, suffix);
-    const opts = { includePlans: false, includeRoutines: true, includeExams: true };
-    if (snapMode === "list") {
-      downloadRoutineSnapList({ startDate: snapStart, endDate: snapEnd, calendarData, routines, routineChecks, mixedExams, dark, label, userName, userPhoto, opts });
-    } else {
-      downloadRoutineSnap({ startDate: snapStart, endDate: snapEnd, calendarData, routines, routineChecks, mixedExams, dark, label, userName, userPhoto, opts });
-    }
+  const deletePlan = (plan) => {
+    if (!window.confirm(`"${plan.name}" প্ল্যানটা ডিলিট করবে?`)) return;
+    setRoutinePlans(routinePlans.filter((p) => p.id !== plan.id));
+    setMode("list");
+    setActivePlanId(null);
   };
 
-  const toggleDow = (d) => setForm((f) => ({ ...f, daysOfWeek: f.daysOfWeek.includes(d) ? f.daysOfWeek.filter((x) => x !== d) : [...f.daysOfWeek, d] }));
-
-  const saveRoutine = () => {
-    if (!form.title.trim()) { alert("Add a title/name first."); return; }
-    if (form.recurring) {
-      if (!form.daysOfWeek.length) { alert("Pick at least one day of the week for a recurring item."); return; }
-      setRoutines([{ id: uid(), kind: form.kind, title: form.title.trim(), mode: form.kind === "class" ? form.mode : "", note: form.note, recurring: true, daysOfWeek: form.daysOfWeek, startDate: form.startDate, endDate: form.endDate, skipDates: [] }, ...routines]);
-    } else {
-      if (!form.date) { alert("Pick a date."); return; }
-      setRoutines([{ id: uid(), kind: form.kind, title: form.title.trim(), mode: form.kind === "class" ? form.mode : "", note: form.note, recurring: false, date: form.date, skipDates: [] }, ...routines]);
-    }
-    resetForm();
-  };
-
-  const updateRoutine = (item, patch) => {
-    setRoutines(routines.map((r) => (r.id === item.id ? { ...r, ...patch } : r)));
-  };
-
-  const deleteRoutine = (item) => {
-    if (!window.confirm(`Remove "${item.title}" from your routine?`)) return;
-    setRoutines(routines.filter((r) => r.id !== item.id));
-    const nextChecks = {};
-    Object.keys(routineChecks).forEach((d) => {
-      const day = { ...routineChecks[d] };
-      delete day[item.id];
-      nextChecks[d] = day;
-    });
-    setRoutineChecks(nextChecks);
-  };
-
-  const buildSharePayload = () => ({
-    routineShareVersion: 1,
-    exportedAt: new Date().toISOString(),
-    items: routines.map((r) => ({
-      kind: r.kind, title: r.title, mode: r.mode || "", note: r.note || "",
-      recurring: !!r.recurring, daysOfWeek: r.daysOfWeek || [], startDate: r.startDate || "", endDate: r.endDate || "", date: r.date || "",
-    })),
-  });
-
-  const importShare = () => {
-    if (!importText.trim()) { alert("Paste the routine text first."); return; }
-    let data;
-    try { data = JSON.parse(importText); } catch (e) { alert("Couldn't read that — make sure it's routine text copied from \"Export routine\"."); return; }
-    const items = Array.isArray(data.items) ? data.items : [];
-    if (!items.length) { alert("No routine items found in that text."); return; }
-    const key = (it) => [it.kind, (it.title || "").trim().toLowerCase(), it.date || "", [...(it.daysOfWeek || [])].sort().join(",")].join("|");
-    const existing = new Set(routines.map(key));
-    const newRoutines = [];
-    items.forEach((it) => {
-      const k = key(it);
-      if (existing.has(k)) return;
-      existing.add(k);
-      newRoutines.push({
-        id: uid(), kind: it.kind, title: it.title || "Untitled", mode: it.mode || "", note: it.note || "",
-        recurring: !!it.recurring, daysOfWeek: it.daysOfWeek || [], startDate: it.startDate || "", endDate: it.endDate || "",
-        date: it.date || "", skipDates: [],
-      });
-    });
-    if (!newRoutines.length) { alert("Everything in that routine is already in your list — nothing new to add."); return; }
-    setRoutines([...routines, ...newRoutines]);
-    alert(`Imported ${newRoutines.length} routine item(s).`);
-    setImportText("");
-    setShareModal(null);
-  };
-
-  const filtered = routines.filter((r) => {
-    if (filterKind !== "all" && r.kind !== filterKind) return false;
-    if (filterMode !== "all" && r.mode !== filterMode) return false;
-    if ((fromDate || toDate) && r.recurring) return true; // recurring ignores date filter
-    if (fromDate && r.date && r.date < fromDate) return false;
-    if (toDate && r.date && r.date > toDate) return false;
-    return true;
-  });
-  const routineSortKey = (item) => (item.recurring ? (item.startDate || "0000-00-00") : (item.date || "9999-99-99"));
-  const sortedFiltered = [...filtered].sort((a, b) => {
-    const ka = routineSortKey(a), kb = routineSortKey(b);
-    return ka < kb ? -1 : ka > kb ? 1 : 0;
-  });
-
-  const tour = useTabTour("routine");
+  const activePlan = routinePlans.find((p) => p.id === activePlanId);
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
-        <div>
-          <p className="text-sm font-semibold" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>Routine</p>
-          <p className="text-xs" style={{ color: "var(--faint)" }}>Classes and other regular activity — shown as a checklist here and on the Calendar tab. Exams live in the Exam tab now.</p>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={() => setSnapOpen((v) => !v)} data-tour="rt-snap" className="text-xs font-semibold px-2.5 py-1.5 rounded flex items-center gap-1" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>
-            <Camera size={13} /> Snap
-          </button>
-          <div className="flex gap-2" data-tour="rt-share">
-            <button onClick={() => setShareModal("export")} className="text-xs font-semibold px-2.5 py-1.5 rounded flex items-center gap-1" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>
-              <Share2 size={13} /> Export routine
-            </button>
-            <button onClick={() => setShareModal("import")} className="text-xs font-semibold px-2.5 py-1.5 rounded flex items-center gap-1" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>
-              <Upload size={13} /> Import routine
+      {mode === "list" && (
+        <>
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <div>
+              <p className="text-sm font-semibold" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>স্টাডি প্ল্যান</p>
+              <p className="text-xs" style={{ color: "var(--faint)" }}>তোমার সিলেবাস থেকে বানানো ব্যক্তিগত রুটিন</p>
+            </div>
+            <button onClick={startNew} className="text-xs font-semibold px-3 py-1.5 rounded flex items-center gap-1" style={{ background: "#1F8A3B", color: "#fff" }}>
+              <Plus size={14} /> নতুন প্ল্যান
             </button>
           </div>
-          <button onClick={tour.replay} className="text-xs font-semibold px-2 py-1.5 rounded flex-shrink-0 flex items-center gap-1"
-            style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--accent)", border: "1px solid var(--border)", background: "var(--surface)" }}
-            title="Replay the Routine guide">
-            <HelpCircle size={12} /> guide
-          </button>
-        </div>
-      </div>
 
-      {snapOpen && (
-        <div className="p-3 rounded-lg mb-5 mt-3" style={{ background: "var(--panel)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", border: "1px solid var(--divider)" }}>
-          <p className="text-xs font-semibold mb-1" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>Snap your planning as an image</p>
-          <p className="text-xs mb-2" style={{ color: "var(--faint)" }}>Pick a range — a couple of days, a week, a month, or anything custom — and download it as a single PNG showing your classes, exams, and other routine items, color-coded. (Study plans have their own snap on the Calendar tab.)</p>
-          <div className="flex gap-1.5 mb-2">
-            <button onClick={() => setSnapMode("calendar")} className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded flex items-center justify-center gap-1"
-              style={{ background: snapMode === "calendar" ? "var(--ink-strong)" : "var(--surface)", color: snapMode === "calendar" ? "var(--on-ink)" : "var(--muted)", border: `1px solid ${snapMode === "calendar" ? "var(--ink-strong)" : "var(--border)"}` }}>
-              <CalendarDays size={12} /> Calendar
-            </button>
-            <button onClick={() => setSnapMode("list")} className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded flex items-center justify-center gap-1"
-              style={{ background: snapMode === "list" ? "var(--ink-strong)" : "var(--surface)", color: snapMode === "list" ? "var(--on-ink)" : "var(--muted)", border: `1px solid ${snapMode === "list" ? "var(--ink-strong)" : "var(--border)"}` }}>
-              <ClipboardList size={12} /> Detailed list
-            </button>
-          </div>
-          <p className="text-xs mb-2" style={{ color: "var(--faint)" }}>
-            {snapMode === "list" ? "A plain itemized table — day, date, type, and event name for every entry, one row each." : "A calendar-grid view of the range, colour-coded chips per day."}
-          </p>
-          <div className="flex gap-2 mb-2 flex-wrap">
-            <button onClick={setSnapToday} className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>today</button>
-            <button onClick={setSnapWeek} className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>this week</button>
-            <button onClick={setSnapMonth} className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>this month</button>
-          </div>
-          <div className="flex items-center gap-2 mb-2 flex-wrap">
-            <label className="text-xs" style={{ color: "var(--muted)" }}>from
-              <TinyInput type="date" value={snapStart} onChange={(e) => setSnapStart(e.target.value)} style={{ display: "block", marginTop: 2 }} />
-            </label>
-            <label className="text-xs" style={{ color: "var(--muted)" }}>to
-              <TinyInput type="date" value={snapEnd} onChange={(e) => setSnapEnd(e.target.value)} style={{ display: "block", marginTop: 2 }} />
-            </label>
-          </div>
-          <button onClick={doSnap} className="text-sm font-semibold px-3 py-1.5 rounded" style={{ background: "var(--ink-strong)", color: "var(--on-ink)" }}>download snap</button>
-        </div>
-      )}
-
-      {todaysItems.length > 0 && (
-        <div className="mb-5 mt-3" data-tour="rt-today">
-          <p className="text-xs font-semibold mb-2 uppercase" style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--muted)", letterSpacing: 0.4 }}>Today · {today}</p>
-          <div className="space-y-2">
-            {todaysItems.map((item) => (
-              <RoutineCard key={item.id} item={item} checked={(routineChecks[today] || {})[item.id]} onToggle={() => toggleCheck(today, item.id)}
-                onUpdate={(patch) => updateRoutine(item, patch)} onDelete={() => deleteRoutine(item)} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div data-tour="rt-weekly">
-        <WeeklyPlanSection subjectsData={subjectsData} track={track} weeklyPlans={weeklyPlans} setWeeklyPlans={setWeeklyPlans} weekStartDay={weekStartDay} dark={dark} userName={userName} userPhoto={userPhoto} loaded={loaded} mixedExams={mixedExams} />
-      </div>
-
-      <div className="p-3 rounded-lg mb-6 mt-4" data-tour="rt-add" style={{ background: "var(--panel)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", border: "1px solid var(--divider)" }}>
-        <p className="text-xs font-semibold mb-2" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>Add to routine</p>
-        <div className="flex gap-2 mb-2 flex-wrap">
-          <select value={form.kind} onChange={(e) => setForm((f) => ({ ...blankForm, kind: e.target.value, title: f.title, note: f.note }))}
-            className="text-xs rounded border px-2 py-1.5 tk-field" style={{ borderColor: "var(--border)" }}>
-            <option value="class">Class</option>
-            <option value="other">Other</option>
-          </select>
-          <TinyInput placeholder={form.kind === "class" ? "class subject/topic" : "title"}
-            value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} style={{ flex: "1 1 200px" }} />
-          {form.kind === "class" && (
-            <select value={form.mode} onChange={(e) => setForm((f) => ({ ...f, mode: e.target.value }))}
-              className="text-xs rounded border px-2 py-1.5 tk-field" style={{ borderColor: "var(--border)" }}>
-              <option value="offline">Offline</option>
-              <option value="online">Online</option>
-            </select>
+          {routinePlans.length === 0 ? (
+            <div className="p-8 rounded-lg text-center" style={{ background: "var(--panel)", border: "1px solid var(--divider)" }}>
+              <p className="text-sm font-bold mb-1" style={{ color: "var(--ink)" }}>এখনো কোনো স্টাডি প্ল্যান নেই</p>
+              <p className="text-xs mb-3" style={{ color: "var(--faint)" }}>একটি প্ল্যান বানাও — আমরা তোমার ক্লাস, কুইজ ও রিভিশন সাজিয়ে দেবো।</p>
+              <button onClick={startNew} className="text-sm font-semibold px-4 py-2 rounded" style={{ background: "#1F8A3B", color: "#fff" }}>প্রথম প্ল্যান বানাও</button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {routinePlans.map((plan) => {
+                const schedule = generateRoutinePlanSchedule(plan);
+                const allBlocks = schedule.flatMap((d) => d.blocks.map((b) => ({ ...b, date: d.date })));
+                const done = allBlocks.filter((b) => !!(routineChecks[b.date] || {})[`rp-${plan.id}-${b.id}`]).length;
+                const pct = allBlocks.length ? Math.round((done / allBlocks.length) * 100) : 0;
+                return (
+                  <div key={plan.id} className="p-3 rounded-lg cursor-pointer" style={{ background: "var(--panel)", border: "1px solid var(--divider)" }}
+                    onClick={() => { setActivePlanId(plan.id); setMode("dashboard"); }}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-bold" style={{ color: "var(--ink)" }}>{plan.name}</p>
+                        <p className="text-xs" style={{ color: "var(--faint)" }}>{plan.startDate} → {plan.endDate} · {(plan.chapters || []).length}টি অধ্যায় · {pct}%</p>
+                      </div>
+                      <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                        <IconBtn onClick={() => startEdit(plan)} title="পরিবর্তন"><ChevronRight size={14} /></IconBtn>
+                        <IconBtn onClick={() => deletePlan(plan)} title="ডিলিট"><Trash2 size={14} /></IconBtn>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
-        </div>
 
-        <label className="flex items-center gap-1.5 text-xs mb-2" style={{ color: "var(--muted)" }}>
-          <input type="checkbox" checked={form.recurring} onChange={(e) => setForm((f) => ({ ...f, recurring: e.target.checked }))} />
-          recurring (repeats weekly)
-        </label>
-
-        {form.recurring ? (
-          <div className="mb-2">
-            <div className="flex gap-1 mb-2">
-              {DOW_LABELS.map((d, i) => (
-                <button key={i} onClick={() => toggleDow(i)} type="button"
-                  className="w-7 h-7 rounded-full text-xs"
-                  style={{ background: form.daysOfWeek.includes(i) ? "var(--ink-strong)" : "var(--surface)", color: form.daysOfWeek.includes(i) ? "var(--on-ink)" : "var(--ink-soft)", border: "1px solid var(--border)" }}>
-                  {d}
-                </button>
-              ))}
-            </div>
-            <div className="flex gap-2 flex-wrap">
-              <label className="text-xs" style={{ color: "var(--muted)" }}>from
-                <TinyInput type="date" value={form.startDate} onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))} style={{ display: "block", marginTop: 2 }} />
-              </label>
-              <label className="text-xs" style={{ color: "var(--muted)" }}>until (optional)
-                <TinyInput type="date" value={form.endDate} onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))} style={{ display: "block", marginTop: 2 }} />
-              </label>
-            </div>
+          <div className="mt-6">
+            <WeeklyPlanSection subjectsData={subjectsData} track={track} weeklyPlans={weeklyPlans} setWeeklyPlans={setWeeklyPlans} weekStartDay={weekStartDay} dark={dark} userName={userName} userPhoto={userPhoto} loaded={loaded} mixedExams={mixedExams} />
           </div>
-        ) : (
-          <div className="mb-2">
-            <TinyInput type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} />
-          </div>
-        )}
-
-        <textarea placeholder="note (optional)" value={form.note} onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
-          className="w-full text-xs rounded border p-2 mb-2 tk-field" style={{ borderColor: "var(--border)", fontFamily: "Inter, sans-serif" }} rows={1} />
-
-        <button onClick={saveRoutine} className="w-full text-sm font-semibold py-2 rounded" style={{ background: "var(--ink-strong)", color: "var(--on-ink)" }}>add to routine</button>
-      </div>
-
-      <div className="flex gap-2 mb-3 flex-wrap" data-tour="rt-filters">
-        <select value={filterKind} onChange={(e) => setFilterKind(e.target.value)} className="text-xs rounded border px-2 py-1.5 tk-field" style={{ borderColor: "var(--border)" }}>
-          <option value="all">All categories</option>
-          <option value="class">Class</option>
-          <option value="other">Other</option>
-        </select>
-        <select value={filterMode} onChange={(e) => setFilterMode(e.target.value)} className="text-xs rounded border px-2 py-1.5 tk-field" style={{ borderColor: "var(--border)" }}>
-          <option value="all">All types</option>
-          <option value="offline">Offline</option>
-          <option value="online">Online</option>
-        </select>
-        <TinyInput type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-        <TinyInput type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
-      </div>
-
-      <div className="space-y-2" data-tour="rt-list">
-        {sortedFiltered.map((item) => (
-          <RoutineCard key={item.id} item={item} checked={null} onToggle={null}
-            onUpdate={(patch) => updateRoutine(item, patch)} onDelete={() => deleteRoutine(item)} />
-        ))}
-        {sortedFiltered.length === 0 && <p className="text-sm" style={{ color: "var(--faint)" }}>No routine items match these filters yet.</p>}
-      </div>
-
-      {shareModal === "export" && (
-        <ModalShell title="ROUTINE" subtitle="Copy this to share your routine" onClose={() => setShareModal(null)}>
-          <p className="text-xs mb-2" style={{ color: "var(--faint)" }}>
-            This only includes your routine templates — no completion history or exam marks. Send the copied text to a friend; they paste it into "Import routine" on their own Ledger.
-          </p>
-          <textarea ref={shareCopyRef} readOnly value={JSON.stringify(buildSharePayload())} onFocus={(e) => e.target.select()}
-            className="w-full text-xs p-2 rounded mb-2 tk-field" style={{ height: 140, resize: "none", border: "1px solid var(--border)", fontFamily: "JetBrains Mono, monospace" }} />
-          <button onClick={() => {
-            const ta = shareCopyRef.current;
-            try { ta.focus(); ta.select(); const ok = document.execCommand && document.execCommand("copy"); alert(ok ? "Copied! Send it to your friend." : "Selected — use your keyboard's Copy option."); }
-            catch (err) { alert("Selected — use your keyboard's Copy option."); }
-          }} className="w-full text-xs font-semibold px-2 py-1.5 rounded" style={{ background: "var(--ink-strong)", color: "var(--on-ink)" }}>
-            Select &amp; copy
-          </button>
-        </ModalShell>
+        </>
       )}
 
-      {shareModal === "import" && (
-        <ModalShell title="ROUTINE" subtitle="Paste a friend's shared routine" onClose={() => setShareModal(null)}>
-          <p className="text-xs mb-2" style={{ color: "var(--faint)" }}>
-            This adds to your existing routine — it won't remove anything you already have. Duplicate items (same title, kind, and date/days) are skipped.
-          </p>
-          <textarea value={importText} onChange={(e) => setImportText(e.target.value)} placeholder="Paste shared routine text here…"
-            className="w-full text-xs p-2 rounded mb-2 tk-field" style={{ height: 140, resize: "none", border: "1px solid var(--border)", fontFamily: "JetBrains Mono, monospace" }} />
-          <button onClick={importShare} className="w-full text-xs font-semibold px-2 py-1.5 rounded" style={{ background: "var(--ink-strong)", color: "var(--on-ink)" }}>
-            Import
-          </button>
-        </ModalShell>
+      {mode === "wizard" && draft && (
+        <RoutinePlanWizard draft={draft} setDraft={setDraft} track={track} onCancel={cancelWizard} onFinish={finishWizard} />
       )}
-      <TourGuide tourId="routine" steps={ROUTINE_TOUR_STEPS} active={tour.active && !snapOpen && !shareModal} onDone={tour.stop} />
+
+      {mode === "dashboard" && activePlan && (
+        <RoutinePlanDashboard plan={activePlan} routineChecks={routineChecks} toggleCheck={toggleCheck}
+          onBack={() => { setMode("list"); setActivePlanId(null); }}
+          onEdit={() => startEdit(activePlan)}
+          onDelete={() => deletePlan(activePlan)} />
+      )}
     </div>
   );
 }
@@ -8790,6 +9113,7 @@ function App() {
   const [comparePeople, setComparePeopleState] = useState([]);
   const [routines, setRoutinesState] = useState([]);
   const [routineChecks, setRoutineChecksState] = useState({});
+  const [routinePlans, setRoutinePlansState] = useState([]);
   const [examRoutines, setExamRoutinesState] = useState([]);
   const [examRoutineChecks, setExamRoutineChecksState] = useState({});
   const [predictedDates, setPredictedDatesState] = useState({ engineering: "", medical: "", varsity: "", iba: "" });
@@ -8873,6 +9197,7 @@ function App() {
       const comparePeopleStored = (await loadKey("compare-people")) || [];
       const routinesStored = (await loadKey("routines")) || [];
       const routineChecksStored = (await loadKey("routine-checks")) || {};
+      const routinePlansStored = (await loadKey("routine-plans")) || [];
       const examRoutinesStored = (await loadKey("exam-routines")) || [];
       const examRoutineChecksStored = (await loadKey("exam-routine-checks")) || {};
       const weeklyPlansStored = (await loadKey("weekly-plans")) || {};
@@ -8893,6 +9218,7 @@ function App() {
       setComparePeopleState(comparePeopleStored);
       setRoutinesState(routinesStored);
       setRoutineChecksState(routineChecksStored);
+      setRoutinePlansState(routinePlansStored);
       setExamRoutinesState(examRoutinesStored);
       setExamRoutineChecksState(examRoutineChecksStored);
       setWeeklyPlansState(weeklyPlansStored);
@@ -9308,6 +9634,11 @@ function App() {
     debouncedSave("routine-checks", next);
   };
 
+  const setRoutinePlans = (next) => {
+    setRoutinePlansState(next);
+    debouncedSave("routine-plans", next);
+  };
+
   const setExamRoutines = (next) => {
     setExamRoutinesState(next);
     debouncedSave("exam-routines", next);
@@ -9365,6 +9696,32 @@ function App() {
     });
   };
 
+  // Study Plan blocks, converted into ordinary `routines` items so Overview/Calendar
+  // render them with zero changes to those tabs.
+  const routinePlanRoutines = useMemo(() => {
+    const items = [];
+    for (const plan of routinePlans) {
+      const schedule = generateRoutinePlanSchedule(plan);
+      for (const day of schedule) {
+        for (const block of day.blocks) {
+          const chapLabel = block.subjectId ? rpChapterLabel(block.subjectId, block.chapterId) : null;
+          items.push({
+            id: `rp-${plan.id}-${block.id}`,
+            kind: "class",
+            title: chapLabel ? `${chapLabel} · ${RP_BLOCK_LABELS[block.type]}` : RP_BLOCK_LABELS[block.type],
+            mode: `${block.time}–${block.endTime}`,
+            note: plan.name,
+            recurring: false,
+            date: day.date,
+            skipDates: [],
+          });
+        }
+      }
+    }
+    return items;
+  }, [routinePlans]);
+  const allRoutines = useMemo(() => [...routines, ...routinePlanRoutines], [routines, routinePlanRoutines]);
+
   const [pendingOpen, setPendingOpen] = useState(null);
   const goTo = (tabId, opts) => {
     setTab(tabId);
@@ -9390,6 +9747,7 @@ function App() {
     comparePeople,
     routines,
     routineChecks,
+    routinePlans,
     examRoutines,
     examRoutineChecks,
     weeklyPlans,
@@ -9431,6 +9789,7 @@ function App() {
     const people = data.comparePeople || [];
     const routinesData = data.routines || [];
     const routineChecksData = data.routineChecks || {};
+    const routinePlansData = data.routinePlans || [];
     const examRoutinesData = data.examRoutines || [];
     const examRoutineChecksData = data.examRoutineChecks || {};
     const weeklyPlansData = data.weeklyPlans || {};
@@ -9446,6 +9805,7 @@ function App() {
     setComparePeopleState(people);
     setRoutinesState(routinesData);
     setRoutineChecksState(routineChecksData);
+    setRoutinePlansState(routinePlansData);
     setExamRoutinesState(examRoutinesData);
     setExamRoutineChecksState(examRoutineChecksData);
     setWeeklyPlansState(weeklyPlansData);
@@ -9460,6 +9820,7 @@ function App() {
     await saveKey("compare-people", people);
     await saveKey("routines", routinesData);
     await saveKey("routine-checks", routineChecksData);
+    await saveKey("routine-plans", routinePlansData);
     await saveKey("exam-routines", examRoutinesData);
     await saveKey("exam-routine-checks", examRoutineChecksData);
     await saveKey("weekly-plans", weeklyPlansData);
@@ -10276,13 +10637,13 @@ function App() {
         {!loaded ? (
           <p style={{ color: "var(--faint)" }}>loading your ledger…</p>
         ) : tab === "overview" ? (
-          <OverviewTab subjectsData={subjectsData} calendarData={calendarData} setDayData={setDayData} mixedExams={mixedExams} routines={routines} routineChecks={routineChecks} setRoutineChecks={setRoutineChecks} examRoutines={examRoutines} examRoutineChecks={examRoutineChecks} setExamRoutineChecks={setExamRoutineChecks} predictedDates={predictedDates} setPredictedDate={setPredictedDate} officialDates={officialDates} setOfficialDate={setOfficialDate} track={track} setTrack={setTrack} goTo={goTo} weeklyPlans={weeklyPlans} weekStartDay={weekStartDay} dailyChecks={dailyChecks} setDailyChecks={setDailyChecks} dailyPopupsOn={dailyPopupsOn} otherPopupsOpen={nameModalOpen || todayScheduleOpen || (dailyPopupsOn && !dayAdviceDismissed)} />
+          <OverviewTab subjectsData={subjectsData} calendarData={calendarData} setDayData={setDayData} mixedExams={mixedExams} routines={allRoutines} routineChecks={routineChecks} setRoutineChecks={setRoutineChecks} examRoutines={examRoutines} examRoutineChecks={examRoutineChecks} setExamRoutineChecks={setExamRoutineChecks} predictedDates={predictedDates} setPredictedDate={setPredictedDate} officialDates={officialDates} setOfficialDate={setOfficialDate} track={track} setTrack={setTrack} goTo={goTo} weeklyPlans={weeklyPlans} weekStartDay={weekStartDay} dailyChecks={dailyChecks} setDailyChecks={setDailyChecks} dailyPopupsOn={dailyPopupsOn} otherPopupsOpen={nameModalOpen || todayScheduleOpen || (dailyPopupsOn && !dayAdviceDismissed)} />
         ) : tab === "chapters" ? (
           <ChaptersTab subjectsData={subjectsData} setChapterData={setChapterData} track={track} setTrack={setTrack} dark={dark} calendarData={calendarData} addChapterPlan={addChapterPlan} removeChapterPlan={removeChapterPlan} pendingOpen={pendingOpen} clearPendingOpen={() => setPendingOpen(null)} dailyChecks={dailyChecks} setDailyChecks={setDailyChecks} userName={userName} userPhoto={userPhoto} bgImage={bgImage} />
         ) : tab === "calendar" ? (
-          <CalendarTab calendarData={calendarData} setDayData={setDayData} mixedExams={mixedExams} routines={routines} routineChecks={routineChecks} setRoutineChecks={setRoutineChecks} weekStartDay={weekStartDay} dark={dark} userName={userName} userPhoto={userPhoto} />
+          <CalendarTab calendarData={calendarData} setDayData={setDayData} mixedExams={mixedExams} routines={allRoutines} routineChecks={routineChecks} setRoutineChecks={setRoutineChecks} weekStartDay={weekStartDay} dark={dark} userName={userName} userPhoto={userPhoto} />
         ) : tab === "routine" ? (
-          <RoutineTab routines={routines} setRoutines={setRoutines} routineChecks={routineChecks} setRoutineChecks={setRoutineChecks} mixedExams={mixedExams} calendarData={calendarData} track={track} dark={dark} userName={userName} userPhoto={userPhoto} subjectsData={subjectsData} weeklyPlans={weeklyPlans} setWeeklyPlans={setWeeklyPlans} weekStartDay={weekStartDay} loaded={loaded} />
+          <RoutineTab routinePlans={routinePlans} setRoutinePlans={setRoutinePlans} routineChecks={routineChecks} setRoutineChecks={setRoutineChecks} mixedExams={mixedExams} track={track} dark={dark} userName={userName} userPhoto={userPhoto} subjectsData={subjectsData} weeklyPlans={weeklyPlans} setWeeklyPlans={setWeeklyPlans} weekStartDay={weekStartDay} loaded={loaded} />
         ) : tab === "exams" ? (
           <ExamsTab mixedExams={mixedExams} setMixedExams={setMixedExams} comparePeople={comparePeople} setComparePeople={setComparePeople} examRoutines={examRoutines} setExamRoutines={setExamRoutines} examRoutineChecks={examRoutineChecks} setExamRoutineChecks={setExamRoutineChecks} track={track} dark={dark} userName={userName} userPhoto={userPhoto} />
         ) : tab === "analytics" ? (
