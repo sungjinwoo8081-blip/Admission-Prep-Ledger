@@ -5374,7 +5374,7 @@ const EXAM_PLAN_TOUR_STEPS = [
   { target: "[data-tour='ep-share']", title: "Export / Import exam plan", body: "প্ল্যান করা পরীক্ষার তালিকা (মার্ক ছাড়া) টেক্সট হিসেবে বন্ধুর সাথে শেয়ার করতে পারবে, অথবা বন্ধুর পাঠানোটা এখানে ইমপোর্ট করতে পারবে।" },
 ];
 
-function ExamPlanPanel({ mixedExams, setMixedExams, track }) {
+function ExamPlanPanel({ mixedExams, setMixedExams, track, onPlanFromExam }) {
   const blankForm = () => ({ name: "", date: fmtDate(new Date()), examTrack: track, examType: EXAM_TYPES[0], totalMarks: "", subjects: [] });
   const [form, setForm] = useState(blankForm);
   const [planShareModal, setPlanShareModal] = useState(null); // null | "export" | "import"
@@ -5453,6 +5453,11 @@ function ExamPlanPanel({ mixedExams, setMixedExams, track }) {
     };
     setMixedExams([entry, ...mixedExams]);
     setForm(blankForm());
+    if (entry.subjects.length > 0 && onPlanFromExam) {
+      if (window.confirm(`"${entry.name}"-এর সিলেবাস অনুযায়ী কি একটা স্টাডি প্ল্যান বানিয়ে দেব? (দিনে কত ঘণ্টা পড়বে সেটা এখন জিজ্ঞেস করা হবে, বাকিটা — অধ্যায় বাছাই — এই সিলেবাস থেকে অটো হয়ে যাবে)`)) {
+        onPlanFromExam(entry);
+      }
+    }
   };
 
   const visibleSubjects = trackVisibleSubjects(form.examTrack);
@@ -5579,7 +5584,7 @@ const EXAM_RESULTS_TOUR_STEPS = [
   { target: "[data-tour='er-list']", title: "পরীক্ষার তালিকা ও মার্ক এন্ট্রি", body: "প্রতিটা পরীক্ষার পাশে নিজের প্রাপ্ত মার্ক বসাও (আর কম্পেয়ার করা মানুষদেরও, Daily ছাড়া) — % অটোমেটিক হিসাব হয়ে যাবে।" },
 ];
 
-function ExamMarksPanel({ mixedExams, setMixedExams, comparePeople, setComparePeople, dark, userName, userPhoto }) {
+function ExamMarksPanel({ mixedExams, setMixedExams, comparePeople, setComparePeople, dark, userName, userPhoto, onPlanFromExam }) {
   const descSorted = [...mixedExams].sort((a, b) => (a.date < b.date ? 1 : -1));
 
   const delExam = (id) => setMixedExams(mixedExams.filter((e) => e.id !== id));
@@ -5628,6 +5633,12 @@ function ExamMarksPanel({ mixedExams, setMixedExams, comparePeople, setComparePe
                 {exam.examType} · {trackLabel}{syllabusText ? ` · ${syllabusText}` : ""}
                 {isDaily && <span style={{ color: "var(--accent)" }}> · self exam</span>}
               </p>
+              {(exam.subjects || []).length > 0 && onPlanFromExam && (
+                <button onClick={() => onPlanFromExam(exam)} className="text-xs font-semibold mb-2 px-2 py-1 rounded flex items-center gap-1"
+                  style={{ border: "1px solid var(--border)", color: "var(--accent)" }}>
+                  📘 এই সিলেবাস থেকে স্টাডি প্ল্যান বানাও
+                </button>
+              )}
               <div className="flex items-center gap-3 flex-wrap text-xs" style={{ fontFamily: "JetBrains Mono, monospace" }}>
                 <label className="flex items-center gap-1" style={{ color: "var(--ink-soft)" }}>
                   you:
@@ -5863,7 +5874,7 @@ const EXAM_TRACKER_TOUR_STEPS = [
   { target: "[data-tour='ex-sections']", title: "Exam Tracker-এর ৩টা অংশ", body: "'Plan Exam' দিয়ে আসন্ন পরীক্ষা প্ল্যান করবে, 'Marks'-এ প্রতিটা পরীক্ষার মার্ক বসাবে, আর 'Trend'-এ প্রোগ্রেসের গ্রাফ দেখবে — Daily পরীক্ষাগুলো নিজের জন্য আলাদা 'self' গ্রাফে দেখানো হয়, কারো সাথে তুলনা করা লাগে না। প্রতিটা অংশে প্রথমবার গেলে আলাদা করে একটা ছোট গাইড দেখাবে।" },
 ];
 
-function ExamsTab({ mixedExams, setMixedExams, comparePeople, setComparePeople, track, dark, userName, userPhoto }) {
+function ExamsTab({ mixedExams, setMixedExams, comparePeople, setComparePeople, track, dark, userName, userPhoto, onPlanFromExam }) {
   const [section, setSection] = useState("plan"); // "plan" | "marks" | "trend"
   const SECTIONS = [
     ["plan", "Plan Exam"],
@@ -5894,9 +5905,9 @@ function ExamsTab({ mixedExams, setMixedExams, comparePeople, setComparePeople, 
           <HelpCircle size={12} /> guide
         </button>
       </div>
-      {section === "plan" && <ExamPlanPanel mixedExams={mixedExams} setMixedExams={setMixedExams} track={track} />}
+      {section === "plan" && <ExamPlanPanel mixedExams={mixedExams} setMixedExams={setMixedExams} track={track} onPlanFromExam={onPlanFromExam} />}
       {section === "marks" && (
-        <ExamMarksPanel mixedExams={mixedExams} setMixedExams={setMixedExams} comparePeople={comparePeople} setComparePeople={setComparePeople} dark={dark} userName={userName} userPhoto={userPhoto} />
+        <ExamMarksPanel mixedExams={mixedExams} setMixedExams={setMixedExams} comparePeople={comparePeople} setComparePeople={setComparePeople} dark={dark} userName={userName} userPhoto={userPhoto} onPlanFromExam={onPlanFromExam} />
       )}
       {section === "trend" && (
         <ExamTrendPanel mixedExams={mixedExams} comparePeople={comparePeople} dark={dark} userName={userName} userPhoto={userPhoto} />
@@ -6436,6 +6447,11 @@ function RoutinePlanWizard({ draft, setDraft, track, onCancel, onFinish }) {
           <p className="text-xs mb-3" style={{ color: "var(--faint)" }}>কত সময় আর সপ্তাহে কত ঘণ্টা পড়বে — সেট করো।</p>
           <label className="text-xs block mb-1" style={{ color: "var(--muted)" }}>প্ল্যানের নাম</label>
           <TinyInput value={draft.name} onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))} placeholder="যেমন: BUET Sprint" className="w-full mb-3" />
+          {draft.fromExamSyllabus && (
+            <p className="text-xs font-semibold mb-3" style={{ color: "#1F8A3B" }}>
+              ✅ "{draft.name}"-এর সিলেবাস থেকে {(draft.chapters || []).length}টি অধ্যায় স্বয়ংক্রিয়ভাবে যোগ হয়েছে — শুধু নিচে সময় ঠিক করে দাও।
+            </p>
+          )}
           <div className="flex gap-3 mb-3 flex-wrap">
             <label className="text-xs" style={{ color: "var(--muted)" }}>শুরুর তারিখ
               <TinyInput type="date" value={draft.startDate} onChange={(e) => setDraft((d) => ({ ...d, startDate: e.target.value }))} style={{ display: "block", marginTop: 2 }} />
@@ -6499,7 +6515,7 @@ function RoutinePlanWizard({ draft, setDraft, track, onCancel, onFinish }) {
 
           <div className="flex justify-between">
             <button onClick={onCancel} className="text-sm font-semibold px-3 py-1.5 rounded" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>বাতিল</button>
-            <button onClick={() => setStep(2)} disabled={!draft.name.trim()} className="text-sm font-semibold px-4 py-1.5 rounded" style={{ background: "var(--ink-strong)", color: "var(--on-ink)", opacity: draft.name.trim() ? 1 : 0.5 }}>পরবর্তী: অধ্যায় বাছাই</button>
+            <button onClick={() => setStep(draft.fromExamSyllabus ? 4 : 2)} disabled={!draft.name.trim()} className="text-sm font-semibold px-4 py-1.5 rounded" style={{ background: "var(--ink-strong)", color: "var(--on-ink)", opacity: draft.name.trim() ? 1 : 0.5 }}>{draft.fromExamSyllabus ? "পরবর্তী: চূড়ান্ত করো" : "পরবর্তী: অধ্যায় বাছাই"}</button>
           </div>
         </div>
       )}
@@ -6733,10 +6749,18 @@ function RoutinePlanDashboard({ plan, routineChecks, toggleCheck, onBack, onEdit
   );
 }
 
-function RoutineTab({ routinePlans, setRoutinePlans, routineChecks, setRoutineChecks, dark, userName, userPhoto, subjectsData, weekStartDay, track }) {
+function RoutineTab({ routinePlans, setRoutinePlans, routineChecks, setRoutineChecks, dark, userName, userPhoto, subjectsData, weekStartDay, track, pendingExamPlanDraft, clearPendingExamPlanDraft }) {
   const [mode, setMode] = useState("list"); // "list" | "wizard" | "dashboard"
   const [draft, setDraft] = useState(null);
   const [activePlanId, setActivePlanId] = useState(null);
+
+  useEffect(() => {
+    if (pendingExamPlanDraft) {
+      setDraft(pendingExamPlanDraft);
+      setMode("wizard");
+      clearPendingExamPlanDraft && clearPendingExamPlanDraft();
+    }
+  }, [pendingExamPlanDraft]);
 
   const toggleCheck = (dateStr, id) => {
     setRoutineChecks({ ...routineChecks, [dateStr]: { ...(routineChecks[dateStr] || {}), [id]: !(routineChecks[dateStr] || {})[id] } });
@@ -10040,6 +10064,17 @@ function App() {
   const allRoutines = useMemo(() => [...routines, ...routinePlanRoutines], [routines, routinePlanRoutines]);
 
   const [pendingOpen, setPendingOpen] = useState(null);
+  const [pendingExamPlanDraft, setPendingExamPlanDraft] = useState(null);
+  const planFromExamSyllabus = (exam) => {
+    const chapters = [];
+    (exam.subjects || []).forEach((s) => (s.chapterIds || []).forEach((cid) => chapters.push({ subjectId: s.subjectId, chapterId: cid })));
+    if (!chapters.length) { alert("এই পরীক্ষায় কোনো সিলেবাস (chapter) সিলেক্ট করা নেই।"); return; }
+    const today = fmtDate(new Date());
+    let endDate = dateAddDays(exam.date, -1);
+    if (endDate < today) endDate = exam.date > today ? exam.date : today;
+    setPendingExamPlanDraft({ ...blankRoutinePlan(), name: exam.name, startDate: today, endDate, chapters, fromExamSyllabus: true });
+    setTab("routine");
+  };
   const goTo = (tabId, opts) => {
     setTab(tabId);
     if (opts && opts.subjectId) setPendingOpen({ subjectId: opts.subjectId, chapterId: opts.chapterId });
@@ -10961,11 +10996,11 @@ function App() {
         ) : tab === "calendar" ? (
           <CalendarTab calendarData={calendarData} setDayData={setDayData} mixedExams={mixedExams} routines={allRoutines} routineChecks={routineChecks} setRoutineChecks={setRoutineChecks} weekStartDay={weekStartDay} dark={dark} userName={userName} userPhoto={userPhoto} />
         ) : tab === "routine" ? (
-          <RoutineTab routinePlans={routinePlans} setRoutinePlans={setRoutinePlans} routineChecks={routineChecks} setRoutineChecks={setRoutineChecks} mixedExams={mixedExams} track={track} dark={dark} userName={userName} userPhoto={userPhoto} subjectsData={subjectsData} weeklyPlans={weeklyPlans} setWeeklyPlans={setWeeklyPlans} weekStartDay={weekStartDay} loaded={loaded} />
+          <RoutineTab routinePlans={routinePlans} setRoutinePlans={setRoutinePlans} routineChecks={routineChecks} setRoutineChecks={setRoutineChecks} mixedExams={mixedExams} track={track} dark={dark} userName={userName} userPhoto={userPhoto} subjectsData={subjectsData} weeklyPlans={weeklyPlans} setWeeklyPlans={setWeeklyPlans} weekStartDay={weekStartDay} loaded={loaded} pendingExamPlanDraft={pendingExamPlanDraft} clearPendingExamPlanDraft={() => setPendingExamPlanDraft(null)} />
         ) : tab === "class-routine" ? (
           <ClassRoutineTab routines={routines} setRoutines={setRoutines} routineChecks={routineChecks} setRoutineChecks={setRoutineChecks} mixedExams={mixedExams} calendarData={calendarData} dark={dark} userName={userName} userPhoto={userPhoto} />
         ) : tab === "exams" ? (
-          <ExamsTab mixedExams={mixedExams} setMixedExams={setMixedExams} comparePeople={comparePeople} setComparePeople={setComparePeople} examRoutines={examRoutines} setExamRoutines={setExamRoutines} examRoutineChecks={examRoutineChecks} setExamRoutineChecks={setExamRoutineChecks} track={track} dark={dark} userName={userName} userPhoto={userPhoto} />
+          <ExamsTab mixedExams={mixedExams} setMixedExams={setMixedExams} comparePeople={comparePeople} setComparePeople={setComparePeople} examRoutines={examRoutines} setExamRoutines={setExamRoutines} examRoutineChecks={examRoutineChecks} setExamRoutineChecks={setExamRoutineChecks} track={track} dark={dark} userName={userName} userPhoto={userPhoto} onPlanFromExam={planFromExamSyllabus} />
         ) : tab === "analytics" ? (
           <AnalyticsTab subjectsData={subjectsData} calendarData={calendarData} track={track} dark={dark} predictedDates={predictedDates} officialDates={officialDates} />
         ) : tab === "community" ? (
