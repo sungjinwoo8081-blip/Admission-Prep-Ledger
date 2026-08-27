@@ -6733,7 +6733,7 @@ function RoutinePlanDashboard({ plan, routineChecks, toggleCheck, onBack, onEdit
   );
 }
 
-function RoutineTab({ routinePlans, setRoutinePlans, routineChecks, setRoutineChecks, dark, userName, userPhoto, subjectsData, weeklyPlans, setWeeklyPlans, weekStartDay, loaded, mixedExams, track }) {
+function RoutineTab({ routinePlans, setRoutinePlans, routineChecks, setRoutineChecks, dark, userName, userPhoto, subjectsData, weekStartDay, track }) {
   const [mode, setMode] = useState("list"); // "list" | "wizard" | "dashboard"
   const [draft, setDraft] = useState(null);
   const [activePlanId, setActivePlanId] = useState(null);
@@ -6806,10 +6806,6 @@ function RoutineTab({ routinePlans, setRoutinePlans, routineChecks, setRoutineCh
               })}
             </div>
           )}
-
-          <div className="mt-6">
-            <WeeklyPlanSection subjectsData={subjectsData} track={track} weeklyPlans={weeklyPlans} setWeeklyPlans={setWeeklyPlans} weekStartDay={weekStartDay} dark={dark} userName={userName} userPhoto={userPhoto} loaded={loaded} mixedExams={mixedExams} />
-          </div>
         </>
       )}
 
