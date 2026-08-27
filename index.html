@@ -6392,6 +6392,13 @@ function RoutinePlanWizard({ draft, setDraft, track, mixedExams, onCancel, onFin
     return { ...d, dailyWindows: { ...d.dailyWindows, [dow]: { ...d.dailyWindows[dow], blocks } } };
   });
   const addDayBlock = (dow) => setDraft((d) => ({ ...d, dailyWindows: { ...d.dailyWindows, [dow]: { ...d.dailyWindows[dow], blocks: [...d.dailyWindows[dow].blocks, { start: "18:00", end: "19:00" }] } } }));
+  const removeDayBlock = (dow, idx) => setDraft((d) => ({ ...d, dailyWindows: { ...d.dailyWindows, [dow]: { ...d.dailyWindows[dow], blocks: d.dailyWindows[dow].blocks.filter((_, i) => i !== idx) } } }));
+  const copyDayToAll = (dow) => setDraft((d) => {
+    const source = d.dailyWindows[dow];
+    const next = {};
+    for (let i = 0; i < 7; i++) next[i] = { on: source.on, blocks: source.blocks.map((b) => ({ ...b })) };
+    return { ...d, dailyWindows: next };
+  });
 
   const addSkip = () => {
     if (!skipInput) return;
@@ -6497,7 +6504,10 @@ function RoutinePlanWizard({ draft, setDraft, track, mixedExams, onCancel, onFin
             <p className="text-xs font-semibold" style={{ color: "var(--ink)" }}>🕐 প্রতিদিন কখন পড়বে</p>
             <p className="text-xs font-bold" style={{ color: "var(--accent)" }}>সপ্তাহে মোট {weeklyHrs} Hr</p>
           </div>
-          <p className="text-xs mb-2" style={{ color: "var(--faint)" }}>স্কুল/কোচিং বাদে যে সময়টুকু নিজে পড়তে পারবে সেটাই দাও।</p>
+          <div className="flex items-center justify-between mb-2 flex-wrap gap-1">
+            <p className="text-xs" style={{ color: "var(--faint)" }}>স্কুল/কোচিং বাদে যে সময়টুকু নিজে পড়তে পারবে সেটাই দাও।</p>
+            <button onClick={() => copyDayToAll(0)} className="text-xs font-semibold" style={{ color: "var(--accent)" }}>⧉ রবিবারের সময় সব দিনে বসাও</button>
+          </div>
           <div className="space-y-2 mb-4">
             {[0, 1, 2, 3, 4, 5, 6].map((dow) => (
               <div key={dow} className="p-2.5 rounded-lg" style={{ border: "1px solid var(--border)" }}>
@@ -6513,10 +6523,16 @@ function RoutinePlanWizard({ draft, setDraft, track, mixedExams, onCancel, onFin
                     <TinyInput type="time" value={b.start} onChange={(e) => setDayBlock(dow, i, "start", e.target.value)} />
                     <span style={{ color: "var(--faint)" }}>–</span>
                     <TinyInput type="time" value={b.end} onChange={(e) => setDayBlock(dow, i, "end", e.target.value)} />
+                    {draft.dailyWindows[dow].blocks.length > 1 && (
+                      <button onClick={() => removeDayBlock(dow, i)} title="বাদ দাও"><X size={12} style={{ color: "var(--faint)" }} /></button>
+                    )}
                   </div>
                 ))}
                 {draft.dailyWindows[dow].on && (
-                  <button onClick={() => addDayBlock(dow)} className="text-xs font-semibold" style={{ color: "var(--accent)" }}>+ আরেকটি সময়</button>
+                  <div className="flex items-center gap-3 mt-0.5">
+                    <button onClick={() => addDayBlock(dow)} className="text-xs font-semibold" style={{ color: "var(--accent)" }}>+ আরেকটি সময়</button>
+                    <button onClick={() => copyDayToAll(dow)} className="text-xs font-semibold" style={{ color: "var(--muted)" }}>⧉ সব দিনে কপি করো</button>
+                  </div>
                 )}
               </div>
             ))}
