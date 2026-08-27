@@ -6371,9 +6371,10 @@ function blankRoutinePlan() {
   };
 }
 
-function RoutinePlanWizard({ draft, setDraft, track, onCancel, onFinish }) {
+function RoutinePlanWizard({ draft, setDraft, track, mixedExams, onCancel, onFinish }) {
   const [step, setStep] = useState(1);
   const [skipInput, setSkipInput] = useState("");
+  const [selectedExamIds, setSelectedExamIds] = useState({});
 
   const weeklyHrs = rpWeeklyHours(draft);
   const schedulePreview = step === 4 ? generateRoutinePlanSchedule(draft) : [];
@@ -6398,6 +6399,28 @@ function RoutinePlanWizard({ draft, setDraft, track, onCancel, onFinish }) {
     setSkipInput("");
   };
   const removeSkip = (ds) => setDraft((d) => ({ ...d, skipDates: d.skipDates.filter((x) => x !== ds) }));
+
+  const examsInRange = (mixedExams || [])
+    .filter((e) => e.examTrack === (track || "engineering") && e.date >= draft.startDate && e.date <= draft.endDate && Array.isArray(e.subjects) && e.subjects.length > 0)
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
+  const toggleExamId = (id) => setSelectedExamIds((s) => ({ ...s, [id]: !s[id] }));
+  const applyExamsSyllabus = () => {
+    const chosen = examsInRange.filter((e) => selectedExamIds[e.id]);
+    if (!chosen.length) return;
+    const seen = new Set();
+    const merged = [];
+    chosen.forEach((exam) => {
+      (exam.subjects || []).forEach((s) => {
+        (s.chapterIds || []).forEach((cid) => {
+          const k = `${s.subjectId}::${cid}`;
+          if (seen.has(k)) return;
+          seen.add(k);
+          merged.push({ subjectId: s.subjectId, chapterId: cid });
+        });
+      });
+    });
+    setDraft((d) => ({ ...d, chapters: merged }));
+  };
 
   const visibleSubjects = trackVisibleSubjects(track || "engineering");
   const chapterKey = (subjectId, chapterId) => `${subjectId}::${chapterId}`;
@@ -6512,6 +6535,26 @@ function RoutinePlanWizard({ draft, setDraft, track, onCancel, onFinish }) {
               </span>
             ))}
           </div>
+
+          {examsInRange.length > 0 && (
+            <div className="p-3 rounded-lg mb-4" style={{ border: "1px solid var(--border)", background: "var(--surface)" }}>
+              <p className="text-xs font-semibold mb-1" style={{ color: "var(--ink)" }}>📅 এই সময়ে যে পরীক্ষাগুলো আছে</p>
+              <p className="text-xs mb-2" style={{ color: "var(--faint)" }}>{draft.startDate} থেকে {draft.endDate}-এর মধ্যে যেসব পরীক্ষার সিলেবাস সেট করা আছে — বেছে নিলে সেগুলোর অধ্যায় দিয়ে (তারিখ অনুযায়ী ক্রম রেখে) প্ল্যান বানানো যাবে।</p>
+              <div className="space-y-1 mb-2">
+                {examsInRange.map((exam) => (
+                  <label key={exam.id} className="flex items-center gap-2 text-xs py-0.5" style={{ color: "var(--ink-soft)" }}>
+                    <input type="checkbox" checked={!!selectedExamIds[exam.id]} onChange={() => toggleExamId(exam.id)} />
+                    {exam.name} · {exam.date} · {(exam.subjects || []).reduce((n, s) => n + (s.chapterIds || []).length, 0)}টি অধ্যায়
+                  </label>
+                ))}
+              </div>
+              <button onClick={applyExamsSyllabus} disabled={!examsInRange.some((e) => selectedExamIds[e.id])}
+                className="text-xs font-semibold px-2.5 py-1.5 rounded" style={{ background: "var(--ink-strong)", color: "var(--on-ink)", opacity: examsInRange.some((e) => selectedExamIds[e.id]) ? 1 : 0.5 }}>
+                বাছাই করা পরীক্ষার সিলেবাস দিয়ে অধ্যায় বসাও
+              </button>
+              <p className="text-xs mt-1" style={{ color: "var(--faint)" }}>এটা চাপলে বর্তমান অধ্যায় তালিকা replace হয়ে যাবে — পরের ধাপে চাইলে ম্যানুয়ালি এডিট করতে পারবে।</p>
+            </div>
+          )}
 
           <div className="flex justify-between">
             <button onClick={onCancel} className="text-sm font-semibold px-3 py-1.5 rounded" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>বাতিল</button>
@@ -6749,7 +6792,7 @@ function RoutinePlanDashboard({ plan, routineChecks, toggleCheck, onBack, onEdit
   );
 }
 
-function RoutineTab({ routinePlans, setRoutinePlans, routineChecks, setRoutineChecks, dark, userName, userPhoto, subjectsData, weekStartDay, track, pendingExamPlanDraft, clearPendingExamPlanDraft }) {
+function RoutineTab({ routinePlans, setRoutinePlans, routineChecks, setRoutineChecks, dark, userName, userPhoto, subjectsData, weekStartDay, track, mixedExams, pendingExamPlanDraft, clearPendingExamPlanDraft }) {
   const [mode, setMode] = useState("list"); // "list" | "wizard" | "dashboard"
   const [draft, setDraft] = useState(null);
   const [activePlanId, setActivePlanId] = useState(null);
@@ -6834,7 +6877,7 @@ function RoutineTab({ routinePlans, setRoutinePlans, routineChecks, setRoutineCh
       )}
 
       {mode === "wizard" && draft && (
-        <RoutinePlanWizard draft={draft} setDraft={setDraft} track={track} onCancel={cancelWizard} onFinish={finishWizard} />
+        <RoutinePlanWizard draft={draft} setDraft={setDraft} track={track} mixedExams={mixedExams} onCancel={cancelWizard} onFinish={finishWizard} />
       )}
 
       {mode === "dashboard" && activePlan && (
