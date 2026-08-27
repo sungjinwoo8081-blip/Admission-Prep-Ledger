@@ -6824,6 +6824,327 @@ function RoutineTab({ routinePlans, setRoutinePlans, routineChecks, setRoutineCh
 }
 
 /* ---------------------------------------------------------------
+   CLASS ROUTINE — the old manual "add class/other, checklist,
+   filters, snap, export/import" system, restored as its own tab
+   (separate from the Study Plan wizard above). Simple recurring/
+   one-off class scheduling & tracking, no chapter/AI planning.
+----------------------------------------------------------------*/
+function ClassRoutineTab({ routines, setRoutines, routineChecks, setRoutineChecks, mixedExams, calendarData, dark, userName, userPhoto }) {
+  const blankForm = { kind: "class", title: "", mode: "offline", note: "", recurring: false, daysOfWeek: [], startDate: "", endDate: "", date: fmtDate(new Date()) };
+  const [form, setForm] = useState(blankForm);
+  const [filterKind, setFilterKind] = useState("all");
+  const [filterMode, setFilterMode] = useState("all");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [shareModal, setShareModal] = useState(null); // null | "export" | "import"
+  const [importText, setImportText] = useState("");
+  const shareCopyRef = useRef(null);
+  const [snapOpen, setSnapOpen] = useState(false);
+  const [snapMode, setSnapMode] = useState("calendar"); // "calendar" | "list"
+  const [snapStart, setSnapStart] = useState(fmtDate(new Date()));
+  const [snapEnd, setSnapEnd] = useState(fmtDate(new Date()));
+
+  const today = fmtDate(new Date());
+  const todaysItems = routineItemsForDate(routines, today);
+
+  const toggleCheck = (dateStr, id) => {
+    setRoutineChecks({ ...routineChecks, [dateStr]: { ...(routineChecks[dateStr] || {}), [id]: !(routineChecks[dateStr] || {})[id] } });
+  };
+
+  const resetForm = () => setForm(blankForm);
+
+  const setSnapWeek = () => {
+    const t = new Date();
+    const dow = t.getDay();
+    setSnapStart(dateAddDays(fmtDate(t), -dow));
+    setSnapEnd(dateAddDays(fmtDate(t), 6 - dow));
+  };
+  const setSnapMonth = () => {
+    const t = new Date();
+    setSnapStart(fmtDate(new Date(t.getFullYear(), t.getMonth(), 1)));
+    setSnapEnd(fmtDate(new Date(t.getFullYear(), t.getMonth() + 1, 0)));
+  };
+  const setSnapToday = () => {
+    const t = fmtDate(new Date());
+    setSnapStart(t);
+    setSnapEnd(t);
+  };
+  const doSnap = () => {
+    if (snapStart > snapEnd) { alert("Start date is after end date — swap them and try again."); return; }
+    if (dateAddDays(snapEnd, 1) > dateAddDays(snapStart, 62)) { alert("That's a big range — pick something under about 2 months so the image stays readable."); return; }
+    const suffix = snapMode === "list" ? "Routine (detailed)" : "Routine";
+    const label = personalizedSnapLabel(userName, suffix);
+    const opts = { includePlans: false, includeRoutines: true, includeExams: true };
+    if (snapMode === "list") {
+      downloadRoutineSnapList({ startDate: snapStart, endDate: snapEnd, calendarData, routines, routineChecks, mixedExams, dark, label, userName, userPhoto, opts });
+    } else {
+      downloadRoutineSnap({ startDate: snapStart, endDate: snapEnd, calendarData, routines, routineChecks, mixedExams, dark, label, userName, userPhoto, opts });
+    }
+  };
+
+  const toggleDow = (d) => setForm((f) => ({ ...f, daysOfWeek: f.daysOfWeek.includes(d) ? f.daysOfWeek.filter((x) => x !== d) : [...f.daysOfWeek, d] }));
+
+  const saveRoutine = () => {
+    if (!form.title.trim()) { alert("Add a title/name first."); return; }
+    if (form.recurring) {
+      if (!form.daysOfWeek.length) { alert("Pick at least one day of the week for a recurring item."); return; }
+      setRoutines([{ id: uid(), kind: form.kind, title: form.title.trim(), mode: form.kind === "class" ? form.mode : "", note: form.note, recurring: true, daysOfWeek: form.daysOfWeek, startDate: form.startDate, endDate: form.endDate, skipDates: [] }, ...routines]);
+    } else {
+      if (!form.date) { alert("Pick a date."); return; }
+      setRoutines([{ id: uid(), kind: form.kind, title: form.title.trim(), mode: form.kind === "class" ? form.mode : "", note: form.note, recurring: false, date: form.date, skipDates: [] }, ...routines]);
+    }
+    resetForm();
+  };
+
+  const updateRoutine = (item, patch) => {
+    setRoutines(routines.map((r) => (r.id === item.id ? { ...r, ...patch } : r)));
+  };
+
+  const deleteRoutine = (item) => {
+    if (!window.confirm(`Remove "${item.title}" from your routine?`)) return;
+    setRoutines(routines.filter((r) => r.id !== item.id));
+    const nextChecks = {};
+    Object.keys(routineChecks).forEach((d) => {
+      const day = { ...routineChecks[d] };
+      delete day[item.id];
+      nextChecks[d] = day;
+    });
+    setRoutineChecks(nextChecks);
+  };
+
+  const buildSharePayload = () => ({
+    routineShareVersion: 1,
+    exportedAt: new Date().toISOString(),
+    items: routines.map((r) => ({
+      kind: r.kind, title: r.title, mode: r.mode || "", note: r.note || "",
+      recurring: !!r.recurring, daysOfWeek: r.daysOfWeek || [], startDate: r.startDate || "", endDate: r.endDate || "", date: r.date || "",
+    })),
+  });
+
+  const importShare = () => {
+    if (!importText.trim()) { alert("Paste the routine text first."); return; }
+    let data;
+    try { data = JSON.parse(importText); } catch (e) { alert("Couldn't read that — make sure it's routine text copied from \"Export routine\"."); return; }
+    const items = Array.isArray(data.items) ? data.items : [];
+    if (!items.length) { alert("No routine items found in that text."); return; }
+    const key = (it) => [it.kind, (it.title || "").trim().toLowerCase(), it.date || "", [...(it.daysOfWeek || [])].sort().join(",")].join("|");
+    const existing = new Set(routines.map(key));
+    const newRoutines = [];
+    items.forEach((it) => {
+      const k = key(it);
+      if (existing.has(k)) return;
+      existing.add(k);
+      newRoutines.push({
+        id: uid(), kind: it.kind, title: it.title || "Untitled", mode: it.mode || "", note: it.note || "",
+        recurring: !!it.recurring, daysOfWeek: it.daysOfWeek || [], startDate: it.startDate || "", endDate: it.endDate || "",
+        date: it.date || "", skipDates: [],
+      });
+    });
+    if (!newRoutines.length) { alert("Everything in that routine is already in your list — nothing new to add."); return; }
+    setRoutines([...routines, ...newRoutines]);
+    alert(`Imported ${newRoutines.length} routine item(s).`);
+    setImportText("");
+    setShareModal(null);
+  };
+
+  const filtered = routines.filter((r) => {
+    if (filterKind !== "all" && r.kind !== filterKind) return false;
+    if (filterMode !== "all" && r.mode !== filterMode) return false;
+    if ((fromDate || toDate) && r.recurring) return true; // recurring ignores date filter
+    if (fromDate && r.date && r.date < fromDate) return false;
+    if (toDate && r.date && r.date > toDate) return false;
+    return true;
+  });
+  const routineSortKey = (item) => (item.recurring ? (item.startDate || "0000-00-00") : (item.date || "9999-99-99"));
+  const sortedFiltered = [...filtered].sort((a, b) => {
+    const ka = routineSortKey(a), kb = routineSortKey(b);
+    return ka < kb ? -1 : ka > kb ? 1 : 0;
+  });
+
+  const tour = useTabTour("class-routine");
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
+        <div>
+          <p className="text-sm font-semibold" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>Class Routine</p>
+          <p className="text-xs" style={{ color: "var(--faint)" }}>Classes and other regular activity — shown as a checklist here and on the Calendar tab. Exams live in the Exam tab now.</p>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={() => setSnapOpen((v) => !v)} data-tour="rt-snap" className="text-xs font-semibold px-2.5 py-1.5 rounded flex items-center gap-1" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>
+            <Camera size={13} /> Snap
+          </button>
+          <div className="flex gap-2" data-tour="rt-share">
+            <button onClick={() => setShareModal("export")} className="text-xs font-semibold px-2.5 py-1.5 rounded flex items-center gap-1" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>
+              <Share2 size={13} /> Export routine
+            </button>
+            <button onClick={() => setShareModal("import")} className="text-xs font-semibold px-2.5 py-1.5 rounded flex items-center gap-1" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>
+              <Upload size={13} /> Import routine
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {snapOpen && (
+        <div className="p-3 rounded-lg mb-5 mt-3" style={{ background: "var(--panel)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", border: "1px solid var(--divider)" }}>
+          <p className="text-xs font-semibold mb-1" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>Snap your planning as an image</p>
+          <p className="text-xs mb-2" style={{ color: "var(--faint)" }}>Pick a range — a couple of days, a week, a month, or anything custom — and download it as a single PNG showing your classes, exams, and other routine items, color-coded.</p>
+          <div className="flex gap-1.5 mb-2">
+            <button onClick={() => setSnapMode("calendar")} className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded flex items-center justify-center gap-1"
+              style={{ background: snapMode === "calendar" ? "var(--ink-strong)" : "var(--surface)", color: snapMode === "calendar" ? "var(--on-ink)" : "var(--muted)", border: `1px solid ${snapMode === "calendar" ? "var(--ink-strong)" : "var(--border)"}` }}>
+              <CalendarDays size={12} /> Calendar
+            </button>
+            <button onClick={() => setSnapMode("list")} className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded flex items-center justify-center gap-1"
+              style={{ background: snapMode === "list" ? "var(--ink-strong)" : "var(--surface)", color: snapMode === "list" ? "var(--on-ink)" : "var(--muted)", border: `1px solid ${snapMode === "list" ? "var(--ink-strong)" : "var(--border)"}` }}>
+              <ClipboardList size={12} /> Detailed list
+            </button>
+          </div>
+          <p className="text-xs mb-2" style={{ color: "var(--faint)" }}>
+            {snapMode === "list" ? "A plain itemized table — day, date, type, and event name for every entry, one row each." : "A calendar-grid view of the range, colour-coded chips per day."}
+          </p>
+          <div className="flex gap-2 mb-2 flex-wrap">
+            <button onClick={setSnapToday} className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>today</button>
+            <button onClick={setSnapWeek} className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>this week</button>
+            <button onClick={setSnapMonth} className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ border: "1px solid var(--border)", color: "var(--ink-soft)" }}>this month</button>
+          </div>
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <label className="text-xs" style={{ color: "var(--muted)" }}>from
+              <TinyInput type="date" value={snapStart} onChange={(e) => setSnapStart(e.target.value)} style={{ display: "block", marginTop: 2 }} />
+            </label>
+            <label className="text-xs" style={{ color: "var(--muted)" }}>to
+              <TinyInput type="date" value={snapEnd} onChange={(e) => setSnapEnd(e.target.value)} style={{ display: "block", marginTop: 2 }} />
+            </label>
+          </div>
+          <button onClick={doSnap} className="text-sm font-semibold px-3 py-1.5 rounded" style={{ background: "var(--ink-strong)", color: "var(--on-ink)" }}>download snap</button>
+        </div>
+      )}
+
+      {todaysItems.length > 0 && (
+        <div className="mb-5 mt-3" data-tour="rt-today">
+          <p className="text-xs font-semibold mb-2 uppercase" style={{ fontFamily: "JetBrains Mono, monospace", color: "var(--muted)", letterSpacing: 0.4 }}>Today · {today}</p>
+          <div className="space-y-2">
+            {todaysItems.map((item) => (
+              <RoutineCard key={item.id} item={item} checked={(routineChecks[today] || {})[item.id]} onToggle={() => toggleCheck(today, item.id)}
+                onUpdate={(patch) => updateRoutine(item, patch)} onDelete={() => deleteRoutine(item)} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="p-3 rounded-lg mb-6 mt-4" data-tour="rt-add" style={{ background: "var(--panel)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", border: "1px solid var(--divider)" }}>
+        <p className="text-xs font-semibold mb-2" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>Add to routine</p>
+        <div className="flex gap-2 mb-2 flex-wrap">
+          <select value={form.kind} onChange={(e) => setForm((f) => ({ ...blankForm, kind: e.target.value, title: f.title, note: f.note }))}
+            className="text-xs rounded border px-2 py-1.5 tk-field" style={{ borderColor: "var(--border)" }}>
+            <option value="class">Class</option>
+            <option value="other">Other</option>
+          </select>
+          <TinyInput placeholder={form.kind === "class" ? "class subject/topic" : "title"}
+            value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} style={{ flex: "1 1 200px" }} />
+          {form.kind === "class" && (
+            <select value={form.mode} onChange={(e) => setForm((f) => ({ ...f, mode: e.target.value }))}
+              className="text-xs rounded border px-2 py-1.5 tk-field" style={{ borderColor: "var(--border)" }}>
+              <option value="offline">Offline</option>
+              <option value="online">Online</option>
+            </select>
+          )}
+        </div>
+
+        <label className="flex items-center gap-1.5 text-xs mb-2" style={{ color: "var(--muted)" }}>
+          <input type="checkbox" checked={form.recurring} onChange={(e) => setForm((f) => ({ ...f, recurring: e.target.checked }))} />
+          recurring (repeats weekly)
+        </label>
+
+        {form.recurring ? (
+          <div className="mb-2">
+            <div className="flex gap-1 mb-2">
+              {DOW_LABELS.map((d, i) => (
+                <button key={i} onClick={() => toggleDow(i)} type="button"
+                  className="w-7 h-7 rounded-full text-xs"
+                  style={{ background: form.daysOfWeek.includes(i) ? "var(--ink-strong)" : "var(--surface)", color: form.daysOfWeek.includes(i) ? "var(--on-ink)" : "var(--ink-soft)", border: "1px solid var(--border)" }}>
+                  {d}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <label className="text-xs" style={{ color: "var(--muted)" }}>from
+                <TinyInput type="date" value={form.startDate} onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))} style={{ display: "block", marginTop: 2 }} />
+              </label>
+              <label className="text-xs" style={{ color: "var(--muted)" }}>until (optional)
+                <TinyInput type="date" value={form.endDate} onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))} style={{ display: "block", marginTop: 2 }} />
+              </label>
+            </div>
+          </div>
+        ) : (
+          <div className="mb-2">
+            <TinyInput type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} />
+          </div>
+        )}
+
+        <textarea placeholder="note (optional)" value={form.note} onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
+          className="w-full text-xs rounded border p-2 mb-2 tk-field" style={{ borderColor: "var(--border)", fontFamily: "Inter, sans-serif" }} rows={1} />
+
+        <button onClick={saveRoutine} className="w-full text-sm font-semibold py-2 rounded" style={{ background: "var(--ink-strong)", color: "var(--on-ink)" }}>add to routine</button>
+      </div>
+
+      <div className="flex gap-2 mb-3 flex-wrap" data-tour="rt-filters">
+        <select value={filterKind} onChange={(e) => setFilterKind(e.target.value)} className="text-xs rounded border px-2 py-1.5 tk-field" style={{ borderColor: "var(--border)" }}>
+          <option value="all">All categories</option>
+          <option value="class">Class</option>
+          <option value="other">Other</option>
+        </select>
+        <select value={filterMode} onChange={(e) => setFilterMode(e.target.value)} className="text-xs rounded border px-2 py-1.5 tk-field" style={{ borderColor: "var(--border)" }}>
+          <option value="all">All types</option>
+          <option value="offline">Offline</option>
+          <option value="online">Online</option>
+        </select>
+        <TinyInput type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+        <TinyInput type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+      </div>
+
+      <div className="space-y-2" data-tour="rt-list">
+        {sortedFiltered.map((item) => (
+          <RoutineCard key={item.id} item={item} checked={null} onToggle={null}
+            onUpdate={(patch) => updateRoutine(item, patch)} onDelete={() => deleteRoutine(item)} />
+        ))}
+        {sortedFiltered.length === 0 && <p className="text-sm" style={{ color: "var(--faint)" }}>No routine items match these filters yet.</p>}
+      </div>
+
+      {shareModal === "export" && (
+        <ModalShell title="ROUTINE" subtitle="Copy this to share your routine" onClose={() => setShareModal(null)}>
+          <p className="text-xs mb-2" style={{ color: "var(--faint)" }}>
+            This only includes your routine templates — no completion history or exam marks. Send the copied text to a friend; they paste it into "Import routine" on their own Ledger.
+          </p>
+          <textarea ref={shareCopyRef} readOnly value={JSON.stringify(buildSharePayload())} onFocus={(e) => e.target.select()}
+            className="w-full text-xs p-2 rounded mb-2 tk-field" style={{ height: 140, resize: "none", border: "1px solid var(--border)", fontFamily: "JetBrains Mono, monospace" }} />
+          <button onClick={() => {
+            const ta = shareCopyRef.current;
+            try { ta.focus(); ta.select(); const ok = document.execCommand && document.execCommand("copy"); alert(ok ? "Copied! Send it to your friend." : "Selected — use your keyboard's Copy option."); }
+            catch (err) { alert("Selected — use your keyboard's Copy option."); }
+          }} className="w-full text-xs font-semibold px-2 py-1.5 rounded" style={{ background: "var(--ink-strong)", color: "var(--on-ink)" }}>
+            Select &amp; copy
+          </button>
+        </ModalShell>
+      )}
+
+      {shareModal === "import" && (
+        <ModalShell title="ROUTINE" subtitle="Paste a friend's shared routine" onClose={() => setShareModal(null)}>
+          <p className="text-xs mb-2" style={{ color: "var(--faint)" }}>
+            This adds to your existing routine — it won't remove anything you already have. Duplicate items (same title, kind, and date/days) are skipped.
+          </p>
+          <textarea value={importText} onChange={(e) => setImportText(e.target.value)} placeholder="Paste shared routine text here…"
+            className="w-full text-xs p-2 rounded mb-2 tk-field" style={{ height: 140, resize: "none", border: "1px solid var(--border)", fontFamily: "JetBrains Mono, monospace" }} />
+          <button onClick={importShare} className="w-full text-xs font-semibold px-2 py-1.5 rounded" style={{ background: "var(--ink-strong)", color: "var(--on-ink)" }}>
+            Import
+          </button>
+        </ModalShell>
+      )}
+      <TourGuide tourId="class-routine" steps={ROUTINE_TOUR_STEPS} active={tour.active && !snapOpen && !shareModal} onDone={tour.stop} />
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------
    OVERVIEW — the page that connects every other section
 ----------------------------------------------------------------*/
 function DateBox({ label, value, onChange, accent, placeholder }) {
@@ -9913,6 +10234,7 @@ function App() {
     { id: "chapters", label: "Study", icon: BookOpen },
     { id: "calendar", label: "Calendar", icon: CalendarDays },
     { id: "routine", label: "Routine", icon: Repeat },
+    { id: "class-routine", label: "Class Routine", icon: CalendarDays },
     { id: "exams", label: "Exam Tracker", icon: Award },
     { id: "analytics", label: "Analytics", icon: BarChart3 },
     ...(window.cloudSync && window.cloudSync.enabled ? [{ id: "community", label: "Community", icon: Users }] : []),
@@ -10640,6 +10962,8 @@ function App() {
           <CalendarTab calendarData={calendarData} setDayData={setDayData} mixedExams={mixedExams} routines={allRoutines} routineChecks={routineChecks} setRoutineChecks={setRoutineChecks} weekStartDay={weekStartDay} dark={dark} userName={userName} userPhoto={userPhoto} />
         ) : tab === "routine" ? (
           <RoutineTab routinePlans={routinePlans} setRoutinePlans={setRoutinePlans} routineChecks={routineChecks} setRoutineChecks={setRoutineChecks} mixedExams={mixedExams} track={track} dark={dark} userName={userName} userPhoto={userPhoto} subjectsData={subjectsData} weeklyPlans={weeklyPlans} setWeeklyPlans={setWeeklyPlans} weekStartDay={weekStartDay} loaded={loaded} />
+        ) : tab === "class-routine" ? (
+          <ClassRoutineTab routines={routines} setRoutines={setRoutines} routineChecks={routineChecks} setRoutineChecks={setRoutineChecks} mixedExams={mixedExams} calendarData={calendarData} dark={dark} userName={userName} userPhoto={userPhoto} />
         ) : tab === "exams" ? (
           <ExamsTab mixedExams={mixedExams} setMixedExams={setMixedExams} comparePeople={comparePeople} setComparePeople={setComparePeople} examRoutines={examRoutines} setExamRoutines={setExamRoutines} examRoutineChecks={examRoutineChecks} setExamRoutineChecks={setExamRoutineChecks} track={track} dark={dark} userName={userName} userPhoto={userPhoto} />
         ) : tab === "analytics" ? (
