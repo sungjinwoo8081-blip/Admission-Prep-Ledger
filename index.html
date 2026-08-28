@@ -6297,14 +6297,18 @@ function generateRoutinePlanSchedule(plan, routineChecks, todayStr, mixedExams) 
   const doRevisionOnly = mode === "revisionOnly" || mode === "weakness";
   const isChecked = (date, blockId) => !!(routineChecks[date] || {})[`rp-${plan.id}-${blockId}`];
 
-  // exam-day map: date -> merged {subjectId, chapterId} pairs from every exam that lands that day
+  // exam-day map: date -> merged {subjectId, chapterId} pairs from every exam that lands that day,
+  // restricted to chapters that are actually part of THIS plan (not the exam's whole syllabus).
+  const planChapterKeys = new Set(chapters.map((c) => `${c.subjectId}::${c.chapterId}`));
   const examsByDate = {};
   (mixedExams || []).forEach((exam) => {
     if (!Array.isArray(exam.subjects) || !exam.subjects.length) return;
     if (exam.date < plan.startDate || exam.date > plan.endDate) return;
     const pairs = [];
-    exam.subjects.forEach((s) => (s.chapterIds || []).forEach((cid) => pairs.push({ subjectId: s.subjectId, chapterId: cid })));
-    if (!pairs.length) return;
+    exam.subjects.forEach((s) => (s.chapterIds || []).forEach((cid) => {
+      if (planChapterKeys.has(`${s.subjectId}::${cid}`)) pairs.push({ subjectId: s.subjectId, chapterId: cid });
+    }));
+    if (!pairs.length) return; // this exam has nothing to do with this plan's syllabus — ignore it
     if (!examsByDate[exam.date]) examsByDate[exam.date] = { names: [], pairs: [] };
     examsByDate[exam.date].names.push(exam.name);
     examsByDate[exam.date].pairs.push(...pairs);
