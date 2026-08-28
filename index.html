@@ -6218,6 +6218,7 @@ const RP_CONTENT_TYPES = [
   { id: "recorded", bn: "রেকর্ডেড" },
   { id: "live", bn: "লাইভ" },
   { id: "notes", bn: "নোট" },
+  { id: "qbank", bn: "প্রশ্নব্যাংক সমাধান" },
   { id: "quiz", bn: "কুইজ" },
   { id: "mcq", bn: "এমসিকিউ" },
   { id: "cq", bn: "সিকিউ" },
@@ -6228,7 +6229,7 @@ const RP_VISIBILITY = [
   { id: "link", bn: "লিংক যাদের আছে" },
   { id: "public", bn: "সবাই (পাবলিক)" },
 ];
-const RP_BLOCK_LABELS = { recorded: "রেকর্ডেড", live: "লাইভ", notes: "নোট", quiz: "কুইজ", mcq: "এমসিকিউ", cq: "সিকিউ", mock: "মক", revision: "রিভিশন", buffer: "ক্যাচ-আপ/বাফার" };
+const RP_BLOCK_LABELS = { recorded: "রেকর্ডেড", live: "লাইভ", notes: "নোট", qbank: "প্রশ্নব্যাংক", quiz: "কুইজ", mcq: "এমসিকিউ", cq: "সিকিউ", mock: "মক", revision: "রিভিশন", examRevision: "পরীক্ষার আগে রিভিশন", buffer: "ক্যাচ-আপ/বাফার" };
 
 function rpBnDateLabel(dateStr) {
   const d = new Date(dateStr + "T00:00:00");
@@ -6247,7 +6248,9 @@ function rpDailyMinutes(plan, dow) {
   return w.blocks.reduce((sum, b) => {
     const [sh, sm] = b.start.split(":").map(Number);
     const [eh, em] = b.end.split(":").map(Number);
-    return sum + Math.max(0, (eh * 60 + em) - (sh * 60 + sm));
+    let mins = (eh * 60 + em) - (sh * 60 + sm);
+    if (mins < 0) mins += 1440; // overnight block (end time is after midnight)
+    return sum + mins;
   }, 0);
 }
 function rpFirstStart(plan, dow) {
@@ -6265,8 +6268,13 @@ function rpWeeklyHours(plan) {
   return Math.round((mins / 60) * 10) / 10;
 }
 
-// Builds the day-by-day generated schedule for a plan. Pure function — recomputed on read.
-function generateRoutinePlanSchedule(plan) {
+// Builds the day-by-day generated schedule for a plan.
+// Deterministic per (date, block) so checkbox state (keyed by block id) survives re-renders.
+// Depends on routineChecks + todayStr to carry an incomplete past day's chapter into the next day.
+// mixedExams (optional) lets exam days get a short pre-exam revision instead of a normal full session.
+function generateRoutinePlanSchedule(plan, routineChecks, todayStr, mixedExams) {
+  routineChecks = routineChecks || {};
+  todayStr = todayStr || fmtDate(new Date());
   const chapters = plan.chapters || [];
   if (!chapters.length || !plan.startDate || !plan.endDate) return [];
 
@@ -6287,50 +6295,152 @@ function generateRoutinePlanSchedule(plan) {
   const content = plan.contentTypes || {};
   const days = activeDates.map((date) => ({ date, dow: new Date(date + "T00:00:00").getDay(), blocks: [] }));
   const doRevisionOnly = mode === "revisionOnly" || mode === "weakness";
+  const isChecked = (date, blockId) => !!(routineChecks[date] || {})[`rp-${plan.id}-${blockId}`];
 
-  const passOrder = [];
-  if (!doRevisionOnly) {
-    let chapterCursor = 0, dayIdx = 0;
-    while (chapterCursor < chapters.length && dayIdx < days.length) {
-      const assignToday = mode === "relaxed" ? (dayIdx % 2 === 0) : true;
-      if (assignToday) {
-        const count = mode === "intensified" ? 2 : 1;
-        for (let k = 0; k < count && chapterCursor < chapters.length; k++) {
-          passOrder.push({ dayIdx, chapterIdx: chapterCursor });
-          chapterCursor++;
-        }
-      }
-      dayIdx++;
-    }
-    // backlog / examSprint: compress leftovers onto the last used day rather than losing them
-    while (chapterCursor < chapters.length) {
-      passOrder.push({ dayIdx: Math.max(0, days.length - 1), chapterIdx: chapterCursor });
-      chapterCursor++;
-    }
-  }
-
-  passOrder.forEach(({ dayIdx, chapterIdx }) => {
-    const day = days[dayIdx];
-    if (!day) return;
-    const ch = chapters[chapterIdx];
-    const startTime = rpFirstStart(plan, day.dow) || "18:00";
-    const totalMin = rpDailyMinutes(plan, day.dow) || 60;
-    const divisor = mode === "intensified" ? 2 : 1;
-    const mainMin = Math.max(20, Math.round((totalMin * 0.7) / divisor));
-    const notesMin = Math.max(10, Math.min(20, totalMin - mainMin));
-    let t = startTime;
-    if (content.recorded !== false) {
-      day.blocks.push({ id: uid(), time: t, endTime: rpAddMinutes(t, mainMin), type: "recorded", subjectId: ch.subjectId, chapterId: ch.chapterId });
-      t = rpAddMinutes(t, mainMin);
-    }
-    if (content.notes !== false) {
-      day.blocks.push({ id: uid(), time: t, endTime: rpAddMinutes(t, notesMin), type: "notes", subjectId: ch.subjectId, chapterId: ch.chapterId });
-    }
+  // exam-day map: date -> merged {subjectId, chapterId} pairs from every exam that lands that day
+  const examsByDate = {};
+  (mixedExams || []).forEach((exam) => {
+    if (!Array.isArray(exam.subjects) || !exam.subjects.length) return;
+    if (exam.date < plan.startDate || exam.date > plan.endDate) return;
+    const pairs = [];
+    exam.subjects.forEach((s) => (s.chapterIds || []).forEach((cid) => pairs.push({ subjectId: s.subjectId, chapterId: cid })));
+    if (!pairs.length) return;
+    if (!examsByDate[exam.date]) examsByDate[exam.date] = { names: [], pairs: [] };
+    examsByDate[exam.date].names.push(exam.name);
+    examsByDate[exam.date].pairs.push(...pairs);
   });
 
-  const lastMainDay = passOrder.length ? Math.max(...passOrder.map((p) => p.dayIdx)) : -1;
-  let revCursor = lastMainDay + 1;
-  const revisionTargets = doRevisionOnly ? chapters.map((c, i) => i) : [...new Set(passOrder.map((p) => p.chapterIdx))];
+  const buildChapterBlocks = (day, ch, carriedOver, startTimeOverride, minutesOverride) => {
+    const startTime = startTimeOverride || rpFirstStart(plan, day.dow) || "18:00";
+    const totalMin = minutesOverride != null ? minutesOverride : (rpDailyMinutes(plan, day.dow) || 60);
+    const divisor = mode === "intensified" ? 2 : 1;
+    const parts = [];
+    if (content.recorded !== false) parts.push("recorded");
+    if (content.notes !== false) parts.push("notes");
+    if (content.qbank !== false) parts.push("qbank");
+    if (!parts.length) parts.push("recorded");
+    const recordedMin = parts.includes("recorded") ? Math.max(20, Math.round((totalMin * 0.6) / divisor)) : 0;
+    const otherParts = parts.filter((p) => p !== "recorded");
+    const remaining = Math.max(0, totalMin - recordedMin);
+    const perOther = otherParts.length ? Math.max(10, Math.min(20, Math.floor(remaining / otherParts.length))) : 0;
+    let t = startTime;
+    const blocks = [];
+    parts.forEach((p) => {
+      const dur = p === "recorded" ? recordedMin : perOther;
+      const id = `${p}-${ch.subjectId}-${ch.chapterId}`;
+      blocks.push({ id, time: t, endTime: rpAddMinutes(t, dur), type: p, subjectId: ch.subjectId, chapterId: ch.chapterId, carriedOver });
+      t = rpAddMinutes(t, dur);
+    });
+    return blocks;
+  };
+
+  // Short pre-exam revision covering that day's exam syllabus. Returns { blocks, endTime, usedMin }.
+  const buildExamRevisionBlocks = (day, examInfo) => {
+    const startTime = rpFirstStart(plan, day.dow) || "18:00";
+    const totalMin = rpDailyMinutes(plan, day.dow) || 60;
+    const revisionBudget = Math.min(Math.round(totalMin * 0.4), 40);
+    const uniquePairs = [];
+    const seen = new Set();
+    examInfo.pairs.forEach((p) => {
+      const k = `${p.subjectId}::${p.chapterId}`;
+      if (seen.has(k)) return;
+      seen.add(k);
+      uniquePairs.push(p);
+    });
+    const capped = uniquePairs.slice(0, 4); // don't slice revision into too many tiny chunks
+    if (!capped.length) return { blocks: [], endTime: startTime, usedMin: 0 };
+    const perChapter = Math.max(8, Math.floor(revisionBudget / capped.length));
+    let t = startTime;
+    const blocks = capped.map((p) => {
+      const id = `examrev-${day.date}-${p.subjectId}-${p.chapterId}`;
+      const b = { id, time: t, endTime: rpAddMinutes(t, perChapter), type: "examRevision", subjectId: p.subjectId, chapterId: p.chapterId, examName: examInfo.names[0] };
+      t = rpAddMinutes(t, perChapter);
+      return b;
+    });
+    return { blocks, endTime: t, usedMin: blocks.length * perChapter };
+  };
+
+  const assignedChapterIdx = new Set(); // for revision-target pass later
+
+  if (!doRevisionOnly) {
+    let idx = 0;
+    let carry = null; // an overdue chapter that must repeat
+    let dayCounter = 0;
+    for (const day of days) {
+      const cadenceOk = mode === "relaxed" ? (dayCounter % 2 === 0) : true;
+      dayCounter++;
+      const slots = mode === "intensified" ? 2 : 1;
+      const isPast = day.date < todayStr;
+      const isToday = day.date === todayStr;
+
+      const examInfo = examsByDate[day.date];
+      let slotStartTime = null;
+      let slotMinutes = null;
+      if (examInfo) {
+        const rev = buildExamRevisionBlocks(day, examInfo);
+        day.blocks.push(...rev.blocks);
+        const totalMin = rpDailyMinutes(plan, day.dow) || 60;
+        const leftoverMin = totalMin - rev.usedMin;
+        if (leftoverMin < 20) continue; // whole day is exam-revision only — no room for normal progress
+        slotStartTime = rev.endTime;
+        slotMinutes = leftoverMin;
+      }
+
+      for (let slot = 0; slot < slots; slot++) {
+        let chapterIdx = null;
+        let carriedOver = false;
+        if (carry !== null) {
+          chapterIdx = carry;
+          carriedOver = true;
+        } else if (cadenceOk && idx < chapters.length) {
+          chapterIdx = idx;
+        } else {
+          continue;
+        }
+        const ch = chapters[chapterIdx];
+        if (!ch) continue;
+        // on an exam day, never re-schedule that exact exam's own chapters as "normal progress" —
+        // that's what the revision blocks above are for; just skip ahead to the next different chapter
+        if (examInfo && examInfo.pairs.some((p) => p.subjectId === ch.subjectId && p.chapterId === ch.chapterId)) {
+          if (!carriedOver) idx++;
+          continue;
+        }
+        assignedChapterIdx.add(chapterIdx);
+        const blocks = buildChapterBlocks(day, ch, carriedOver, slotStartTime, slotMinutes);
+        day.blocks.push(...blocks);
+
+        if (isPast || isToday) {
+          const done = blocks.every((b) => isChecked(day.date, b.id));
+          if (done) {
+            carry = null;
+            if (!carriedOver) idx++;
+          } else {
+            carry = chapterIdx; // stays overdue, retried tomorrow
+            if (!carriedOver) idx++; // this chapter now lives on only via `carry`, don't re-issue it fresh
+          }
+        } else {
+          // future day — optimistically assume it'll get done so the plan keeps moving
+          carry = null;
+          if (!carriedOver) idx++;
+        }
+      }
+    }
+    // anything left over (ran out of days): compress onto the last day, like backlog mode
+    const leftovers = [];
+    if (carry !== null) leftovers.push(carry);
+    for (; idx < chapters.length; idx++) leftovers.push(idx);
+    const lastDay = days[days.length - 1];
+    leftovers.forEach((chapterIdx) => {
+      const ch = chapters[chapterIdx];
+      if (!ch || !lastDay) return;
+      assignedChapterIdx.add(chapterIdx);
+      lastDay.blocks.push(...buildChapterBlocks(lastDay, ch, chapterIdx === carry));
+    });
+  }
+
+  const lastMainDayIdx = days.reduce((max, d, i) => (d.blocks.some((b) => b.subjectId && b.type !== "examRevision") ? i : max), -1);
+  let revCursor = lastMainDayIdx + 1;
+  const revisionTargets = doRevisionOnly ? chapters.map((c, i) => i) : [...assignedChapterIdx];
   revisionTargets.forEach((chapterIdx) => {
     while (revCursor < days.length && days[revCursor].blocks.length > 0) revCursor++;
     const day = days[revCursor];
@@ -6338,7 +6448,7 @@ function generateRoutinePlanSchedule(plan) {
     const ch = chapters[chapterIdx];
     const startTime = rpFirstStart(plan, day.dow) || "18:00";
     const revMin = Math.max(15, Math.min(30, rpDailyMinutes(plan, day.dow) || 25));
-    day.blocks.push({ id: uid(), time: startTime, endTime: rpAddMinutes(startTime, revMin), type: "revision", subjectId: ch.subjectId, chapterId: ch.chapterId });
+    day.blocks.push({ id: `revision-${ch.subjectId}-${ch.chapterId}`, time: startTime, endTime: rpAddMinutes(startTime, revMin), type: "revision", subjectId: ch.subjectId, chapterId: ch.chapterId });
     revCursor++;
   });
 
@@ -6346,7 +6456,7 @@ function generateRoutinePlanSchedule(plan) {
     if (day.blocks.length === 0 && rpDailyMinutes(plan, day.dow) > 0) {
       const startTime = rpFirstStart(plan, day.dow) || "18:00";
       const bufMin = Math.max(15, Math.min(30, rpDailyMinutes(plan, day.dow)));
-      day.blocks.push({ id: uid(), time: startTime, endTime: rpAddMinutes(startTime, bufMin), type: "buffer" });
+      day.blocks.push({ id: `buffer-${day.date}`, time: startTime, endTime: rpAddMinutes(startTime, bufMin), type: "buffer" });
     }
     day.blocks.sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : 0));
   });
@@ -6366,18 +6476,18 @@ function blankRoutinePlan() {
     id: uid(), name: "", startDate: today, endDate: dateAddDays(today, 14),
     dailyWindows: RP_BLANK_WINDOWS(), skipDates: [],
     chapters: [], mode: "balanced",
-    contentTypes: { recorded: true, live: true, notes: true, quiz: true, mcq: true, cq: true, mock: true },
+    contentTypes: { recorded: true, live: true, notes: true, qbank: true, quiz: true, mcq: true, cq: true, mock: true },
     visibility: "private", leaderboard: false, createdAt: Date.now(),
   };
 }
 
-function RoutinePlanWizard({ draft, setDraft, track, mixedExams, onCancel, onFinish }) {
+function RoutinePlanWizard({ draft, setDraft, track, mixedExams, routineChecks, onCancel, onFinish }) {
   const [step, setStep] = useState(1);
   const [skipInput, setSkipInput] = useState("");
   const [selectedExamIds, setSelectedExamIds] = useState({});
 
   const weeklyHrs = rpWeeklyHours(draft);
-  const schedulePreview = step === 4 ? generateRoutinePlanSchedule(draft) : [];
+  const schedulePreview = step === 4 ? generateRoutinePlanSchedule(draft, routineChecks, undefined, mixedExams) : [];
 
   const setDur = (n) => setDraft((d) => ({ ...d, endDate: dateAddDays(d.startDate, n - 1) }));
   const durSelected = (() => {
@@ -6680,7 +6790,7 @@ function RoutinePlanWizard({ draft, setDraft, track, mixedExams, onCancel, onFin
                 <p className="text-xs font-bold mb-1" style={{ color: "var(--ink)" }}>{RP_DOW_BN[day.dow]} {rpBnDateLabel(day.date)}</p>
                 {day.blocks.map((b) => (
                   <p key={b.id} className="text-xs" style={{ color: "var(--ink-soft)" }}>
-                    {b.time}–{b.endTime} <span style={{ color: "var(--accent)" }}>{RP_BLOCK_LABELS[b.type]}</span>{b.subjectId ? ` · ${rpChapterLabel(b.subjectId, b.chapterId)}` : ""}
+                    {b.time}–{b.endTime} <span style={{ color: "var(--accent)" }}>{RP_BLOCK_LABELS[b.type]}</span>{b.subjectId ? ` · ${rpChapterLabel(b.subjectId, b.chapterId)}` : ""}{b.type === "examRevision" && b.examName ? ` (${b.examName})` : ""}
                   </p>
                 ))}
               </div>
@@ -6697,10 +6807,10 @@ function RoutinePlanWizard({ draft, setDraft, track, mixedExams, onCancel, onFin
   );
 }
 
-function RoutinePlanDashboard({ plan, routineChecks, toggleCheck, onBack, onEdit, onDelete }) {
+function RoutinePlanDashboard({ plan, routineChecks, mixedExams, toggleCheck, onBack, onEdit, onDelete }) {
   const [tab, setTabState] = useState("progress"); // "full" | "progress" | "leaderboard"
-  const schedule = generateRoutinePlanSchedule(plan);
   const today = fmtDate(new Date());
+  const schedule = generateRoutinePlanSchedule(plan, routineChecks, today, mixedExams);
   const allBlocks = schedule.flatMap((day) => day.blocks.map((b) => ({ ...b, date: day.date })));
   const idFor = (b) => `rp-${plan.id}-${b.id}`;
   const isChecked = (b) => !!(routineChecks[b.date] || {})[idFor(b)];
@@ -6746,7 +6856,7 @@ function RoutinePlanDashboard({ plan, routineChecks, toggleCheck, onBack, onEdit
             {todayBlocks.map((b) => (
               <label key={b.id} className="flex items-center gap-2 text-xs p-1.5 rounded" style={{ background: "var(--surface)" }}>
                 <input type="checkbox" checked={isChecked(b)} onChange={() => toggleCheck(b.date, idFor(b))} />
-                <span style={{ color: "var(--ink-soft)" }}>{b.time}–{b.endTime} · {RP_BLOCK_LABELS[b.type]}{b.subjectId ? ` · ${rpChapterLabel(b.subjectId, b.chapterId)}` : ""}</span>
+                <span style={{ color: "var(--ink-soft)" }}>{b.time}–{b.endTime} · {RP_BLOCK_LABELS[b.type]}{b.subjectId ? ` · ${rpChapterLabel(b.subjectId, b.chapterId)}` : ""}{b.type === "examRevision" && b.examName ? ` (${b.examName})` : ""}{b.carriedOver ? <span style={{ color: "var(--faint)", fontStyle: "italic" }}> · carried over</span> : null}</span>
               </label>
             ))}
             {todayBlocks.length === 0 && <p className="text-xs" style={{ color: "var(--faint)" }}>আজ কিছু শিডিউল করা নেই।</p>}
@@ -6785,7 +6895,7 @@ function RoutinePlanDashboard({ plan, routineChecks, toggleCheck, onBack, onEdit
                   <p className="text-xs font-bold" style={{ color: "var(--ink)" }}>{RP_DOW_BN[day.dow]} {rpBnDateLabel(day.date)}</p>
                   {day.blocks.map((b) => (
                     <p key={b.id} className="text-xs pl-2" style={{ color: isChecked(b) ? "var(--faint)" : "var(--ink-soft)", textDecoration: isChecked(b) ? "line-through" : "none" }}>
-                      {b.time}–{b.endTime} {RP_BLOCK_LABELS[b.type]}{b.subjectId ? ` · ${rpChapterLabel(b.subjectId, b.chapterId)}` : ""}
+                      {b.time}–{b.endTime} {RP_BLOCK_LABELS[b.type]}{b.subjectId ? ` · ${rpChapterLabel(b.subjectId, b.chapterId)}` : ""}{b.type === "examRevision" && b.examName ? ` (${b.examName})` : ""}{b.carriedOver ? <span style={{ fontStyle: "italic" }}> · carried over</span> : null}
                     </p>
                   ))}
                 </div>
@@ -6867,7 +6977,7 @@ function RoutineTab({ routinePlans, setRoutinePlans, routineChecks, setRoutineCh
           ) : (
             <div className="space-y-3">
               {routinePlans.map((plan) => {
-                const schedule = generateRoutinePlanSchedule(plan);
+                const schedule = generateRoutinePlanSchedule(plan, routineChecks, undefined, mixedExams);
                 const allBlocks = schedule.flatMap((d) => d.blocks.map((b) => ({ ...b, date: d.date })));
                 const done = allBlocks.filter((b) => !!(routineChecks[b.date] || {})[`rp-${plan.id}-${b.id}`]).length;
                 const pct = allBlocks.length ? Math.round((done / allBlocks.length) * 100) : 0;
@@ -6893,11 +7003,11 @@ function RoutineTab({ routinePlans, setRoutinePlans, routineChecks, setRoutineCh
       )}
 
       {mode === "wizard" && draft && (
-        <RoutinePlanWizard draft={draft} setDraft={setDraft} track={track} mixedExams={mixedExams} onCancel={cancelWizard} onFinish={finishWizard} />
+        <RoutinePlanWizard draft={draft} setDraft={setDraft} track={track} mixedExams={mixedExams} routineChecks={routineChecks} onCancel={cancelWizard} onFinish={finishWizard} />
       )}
 
       {mode === "dashboard" && activePlan && (
-        <RoutinePlanDashboard plan={activePlan} routineChecks={routineChecks} toggleCheck={toggleCheck}
+        <RoutinePlanDashboard plan={activePlan} routineChecks={routineChecks} mixedExams={mixedExams} toggleCheck={toggleCheck}
           onBack={() => { setMode("list"); setActivePlanId(null); }}
           onEdit={() => startEdit(activePlan)}
           onDelete={() => deletePlan(activePlan)} />
@@ -10100,15 +10210,17 @@ function App() {
   // render them with zero changes to those tabs.
   const routinePlanRoutines = useMemo(() => {
     const items = [];
+    const todayStr = fmtDate(new Date());
     for (const plan of routinePlans) {
-      const schedule = generateRoutinePlanSchedule(plan);
+      const schedule = generateRoutinePlanSchedule(plan, routineChecks, todayStr, mixedExams);
       for (const day of schedule) {
         for (const block of day.blocks) {
           const chapLabel = block.subjectId ? rpChapterLabel(block.subjectId, block.chapterId) : null;
+          const label = chapLabel ? `${chapLabel} · ${RP_BLOCK_LABELS[block.type]}` : RP_BLOCK_LABELS[block.type];
           items.push({
             id: `rp-${plan.id}-${block.id}`,
             kind: "class",
-            title: chapLabel ? `${chapLabel} · ${RP_BLOCK_LABELS[block.type]}` : RP_BLOCK_LABELS[block.type],
+            title: block.carriedOver ? `${label} (carried over)` : label,
             mode: `${block.time}–${block.endTime}`,
             note: plan.name,
             recurring: false,
@@ -10119,7 +10231,7 @@ function App() {
       }
     }
     return items;
-  }, [routinePlans]);
+  }, [routinePlans, routineChecks, mixedExams]);
   const allRoutines = useMemo(() => [...routines, ...routinePlanRoutines], [routines, routinePlanRoutines]);
 
   const [pendingOpen, setPendingOpen] = useState(null);
