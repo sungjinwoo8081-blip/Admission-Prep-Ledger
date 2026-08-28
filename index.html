@@ -5677,9 +5677,12 @@ function ExamTrendPanel({ mixedExams, comparePeople, dark, userName, userPhoto }
   const ascSorted = [...mixedExams].sort((a, b) => (a.date < b.date ? -1 : 1)).filter((e) => parseFloat(e.totalMarks) > 0);
   const ascSortedRegular = ascSorted.filter((e) => e.examType !== "Daily");
   const ascSortedDaily = ascSorted.filter((e) => e.examType === "Daily");
+  const ascSortedWeekly = ascSorted.filter((e) => e.examType === "Weekly");
   const dailyChartRef = useRef(null);
   const trackChartRefs = useRef({});
+  const weeklyTrackChartRefs = useRef({});
   const [snapPickerTrackId, setSnapPickerTrackId] = useState(null);
+  const [snapPickerWeeklyTrackId, setSnapPickerWeeklyTrackId] = useState(null);
 
   const activePeople = (comparePeople || []).filter((p) => mixedExams.some((e) => e.peopleMarks && e.peopleMarks[p.id] !== undefined && e.peopleMarks[p.id] !== ""));
 
@@ -5727,6 +5730,51 @@ function ExamTrendPanel({ mixedExams, comparePeople, dark, userName, userPhoto }
       tempChart.destroy();
     }, 50);
     setSnapPickerTrackId(null);
+  };
+
+  const confirmWeeklyTrendSnap = (trackId, { includeYou, personIds }) => {
+    const t = TRACKS.find((tt) => tt.id === trackId);
+    const trackSorted = ascSortedWeekly.filter((e) => (e.examTrack || "engineering") === trackId);
+    const selectedPeople = (comparePeople || []).filter((p) => personIds.includes(p.id));
+    const trackMax = trackSorted.length ? Math.max(30, ...trackSorted.map((e) => parseFloat(e.totalMarks) || 0)) : 30;
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = 640;
+    tempCanvas.height = 300;
+    const datasets = [
+      { label: "Out of", data: trackSorted.map((e) => parseFloat(e.totalMarks) || 0), borderColor: "#96741F", backgroundColor: "#96741F", pointRadius: 0, borderDash: [5, 4], fill: false },
+    ];
+    if (includeYou) {
+      datasets.push({
+        label: "You", data: trackSorted.map((e) => examStats(e, comparePeople).obtained),
+        borderColor: "#1F6F5C", backgroundColor: "#1F6F5C", pointRadius: 4, tension: 0.3, fill: false,
+      });
+    }
+    selectedPeople.forEach((p, i) => {
+      datasets.push({
+        label: p.name,
+        data: trackSorted.map((e) => examStats(e, comparePeople).peopleTotals[p.id]),
+        borderColor: PERSON_COLORS[i % PERSON_COLORS.length],
+        backgroundColor: PERSON_COLORS[i % PERSON_COLORS.length],
+        pointRadius: 4, tension: 0.3, fill: false, borderDash: [5, 4],
+      });
+    });
+    const tempChart = new window.Chart(tempCanvas.getContext("2d"), {
+      type: "line",
+      data: { labels: trackSorted.map((e) => e.name || e.date), datasets },
+      options: {
+        responsive: false, maintainAspectRatio: false, animation: false,
+        plugins: { legend: { labels: { color: theme.text, font: { size: 12 } } } },
+        scales: {
+          x: { ticks: { color: theme.text, font: { size: 10 } }, grid: { color: theme.grid } },
+          y: { min: 0, max: trackMax, title: { display: true, text: "marks", color: theme.text, font: { size: 10 } }, ticks: { color: theme.text, font: { size: 11 } }, grid: { color: theme.grid } },
+        },
+      },
+    });
+    setTimeout(() => {
+      downloadExamTrendSnap({ chartCanvas: tempCanvas, dark, userName, userPhoto, label: personalizedSnapLabel(userName, `${t.label} Weekly Trend`) });
+      tempChart.destroy();
+    }, 50);
+    setSnapPickerWeeklyTrackId(null);
   };
 
   const snapDaily = () => {
@@ -5851,6 +5899,64 @@ function ExamTrendPanel({ mixedExams, comparePeople, dark, userName, userPhoto }
         )}
       </div>
 
+      <div data-tour="et-weekly" className="mt-8">
+        <p className="text-sm font-semibold mb-1 flex items-center gap-2" style={{ fontFamily: "Lora, serif", color: "var(--ink)" }}>
+          <TrendingUp size={16} /> Weekly exams trend — total marks
+        </p>
+        <p className="text-xs mb-4" style={{ color: "var(--faint)" }}>Only Weekly exams, plotted in raw obtained marks (not %) against each exam's own total — split by track.</p>
+        {TRACKS.map((t) => {
+          const trackSorted = ascSortedWeekly.filter((e) => (e.examTrack || "engineering") === t.id);
+          if (trackSorted.length < 2) return null;
+          const trackMax = Math.max(30, ...trackSorted.map((e) => parseFloat(e.totalMarks) || 0));
+          if (!weeklyTrackChartRefs.current[t.id]) weeklyTrackChartRefs.current[t.id] = { current: null };
+          return (
+            <div key={t.id} className="mb-8">
+              <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                <p className="text-xs font-semibold" style={{ color: "var(--ink)" }}>{t.label}</p>
+                <button onClick={() => setSnapPickerWeeklyTrackId(t.id)}
+                  className="text-xs font-semibold px-3 py-1 rounded-full flex items-center gap-1.5"
+                  style={{ background: "var(--surface)", color: "var(--ink)", border: "1px solid var(--border)", fontFamily: "Inter, sans-serif" }}>
+                  <Camera size={11} /> Snap
+                </button>
+              </div>
+              <ChartCanvas
+                type="line"
+                height={260}
+                canvasRef={weeklyTrackChartRefs.current[t.id]}
+                data={{
+                  labels: trackSorted.map((e) => e.name || e.date),
+                  datasets: [
+                    { label: "Out of", data: trackSorted.map((e) => parseFloat(e.totalMarks) || 0), borderColor: "#96741F", backgroundColor: "#96741F", pointRadius: 0, borderDash: [5, 4], fill: false },
+                    {
+                      label: "You", data: trackSorted.map((e) => examStats(e, comparePeople).obtained),
+                      borderColor: "#1F6F5C", backgroundColor: "#1F6F5C", pointRadius: 4, tension: 0.3, fill: false,
+                    },
+                    ...activePeople.map((p, i) => ({
+                      label: p.name,
+                      data: trackSorted.map((e) => examStats(e, comparePeople).peopleTotals[p.id]),
+                      borderColor: PERSON_COLORS[i % PERSON_COLORS.length],
+                      backgroundColor: PERSON_COLORS[i % PERSON_COLORS.length],
+                      pointRadius: 4, tension: 0.3, fill: false, borderDash: [5, 4],
+                    })),
+                  ],
+                }}
+                options={{
+                  responsive: true, maintainAspectRatio: false,
+                  plugins: { legend: { labels: { color: theme.text, font: { size: 12 } } } },
+                  scales: {
+                    x: { ticks: { color: theme.text, font: { size: 10 } }, grid: { color: theme.grid } },
+                    y: { min: 0, max: trackMax, title: { display: true, text: "marks", color: theme.text, font: { size: 10 } }, ticks: { color: theme.text, font: { size: 11 } }, grid: { color: theme.grid } },
+                  },
+                }}
+              />
+            </div>
+          );
+        })}
+        {TRACKS.every((t) => ascSortedWeekly.filter((e) => (e.examTrack || "engineering") === t.id).length < 2) && (
+          <p className="text-xs" style={{ color: "var(--faint)" }}>Need at least 2 marked Weekly exams within the same track to draw a trend line.</p>
+        )}
+      </div>
+
       {ascSorted.length === 0 && (
         <p className="text-sm" style={{ color: "var(--faint)" }}>No marked exams yet — log some marks in "Marks" first.</p>
       )}
@@ -5865,7 +5971,17 @@ function ExamTrendPanel({ mixedExams, comparePeople, dark, userName, userPhoto }
           onConfirm={(selection) => confirmTrendSnap(snapPickerTrackId, selection)}
         />
       )}
-      <TourGuide tourId="exam-trend" steps={EXAM_TREND_TOUR_STEPS} active={tour.active && !snapPickerTrackId} onDone={tour.stop} />
+      {snapPickerWeeklyTrackId && (
+        <SnapPeoplePickerModal
+          key={`weekly-${snapPickerWeeklyTrackId}`}
+          trackLabel={`${TRACKS.find((t) => t.id === snapPickerWeeklyTrackId)?.label || ""} Weekly`}
+          people={(comparePeople || []).filter((p) => mixedExams.some((e) => (e.examTrack || "engineering") === snapPickerWeeklyTrackId && e.examType === "Weekly" && e.peopleMarks && e.peopleMarks[p.id] !== undefined && e.peopleMarks[p.id] !== ""))}
+          userName={userName}
+          onClose={() => setSnapPickerWeeklyTrackId(null)}
+          onConfirm={(selection) => confirmWeeklyTrendSnap(snapPickerWeeklyTrackId, selection)}
+        />
+      )}
+      <TourGuide tourId="exam-trend" steps={EXAM_TREND_TOUR_STEPS} active={tour.active && !snapPickerTrackId && !snapPickerWeeklyTrackId} onDone={tour.stop} />
     </div>
   );
 }
