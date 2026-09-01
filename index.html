@@ -2993,8 +2993,32 @@ const IconBtn = ({ onClick, children, title }) => (
 ----------------------------------------------------------------*/
 const STATUS_OPTS = [["not", "Not started"], ["progress", "In progress"], ["mastered", "Mastered"]];
 const WEIGHT_OPTS = [["low", "Low"], ["med", "Medium"], ["high", "High"]];
-const ACTIVITY_TYPE_LABEL = { class: "CLASS", qbank: "Q-BANK", self: "SELF STUDY", exam: "EXAM" };
-const ACTIVITY_TYPE_COLOR = { class: "var(--accent2, #3B4C9B)", qbank: "#96741F", self: "#2E7D5B", exam: "#8C3B2E" };
+const ACTIVITY_TYPE_LABEL = { class: "CLASS", qbank: "Q-BANK", self: "SELF STUDY", exam: "EXAM", routine: "ROUTINE" };
+const ACTIVITY_TYPE_COLOR = { class: "var(--accent2, #3B4C9B)", qbank: "#96741F", self: "#2E7D5B", exam: "#8C3B2E", routine: "#1F8A3B" };
+
+// Create/update/remove a chapter activity entry that comes from ticking off a routine-plan
+// block and logging actual minutes. Keyed by blockId so re-editing the same block's minutes
+// updates the same entry instead of stacking duplicates.
+function upsertRoutineActivity(subjectsData, setChapterData, subjectId, chapterId, blockId, date, minutes, label) {
+  const chapterData = subjectsData?.[subjectId]?.[chapterId];
+  if (!chapterData) return;
+  const activities = chapterData.activities || [];
+  const existingIdx = activities.findIndex((a) => a.blockId === blockId);
+  const mins = Number(minutes) || 0;
+  let newActivities;
+  if (mins <= 0) {
+    if (existingIdx < 0) return; // nothing to remove
+    newActivities = activities.filter((a) => a.blockId !== blockId);
+  } else {
+    const hours = Math.round((mins / 60) * 100) / 100;
+    if (existingIdx >= 0) {
+      newActivities = activities.map((a, i) => (i === existingIdx ? { ...a, hours, minutes: mins, date, extra: label } : a));
+    } else {
+      newActivities = [...activities, { id: uid(), type: "routine", date, hours, minutes: mins, blockId, extra: label }];
+    }
+  }
+  setChapterData(subjectId, chapterId, { ...chapterData, activities: newActivities });
+}
 const TEACHER_PRESETS = { Physics: ["Chinmoy Saha"], Math: ["Abhi Dada"], Chemistry: [], Biology: [], Grammar: [], "Vocab & RC": [], "IBA Math": [], "Analytical & Writing": [] };
 
 const CHAPTER_MODAL_TOUR_STEPS = [
@@ -6941,13 +6965,26 @@ function RoutinePlanWizard({ draft, setDraft, track, mixedExams, routineChecks, 
   );
 }
 
-function RoutinePlanDashboard({ plan, routineChecks, mixedExams, toggleCheck, onBack, onEdit, onDelete }) {
+function RoutinePlanDashboard({ plan, routineChecks, mixedExams, toggleCheck, subjectsData, setChapterData, onBack, onEdit, onDelete }) {
   const [tab, setTabState] = useState("progress"); // "full" | "progress" | "leaderboard"
   const today = fmtDate(new Date());
   const schedule = generateRoutinePlanSchedule(plan, routineChecks, today, mixedExams);
   const allBlocks = schedule.flatMap((day) => day.blocks.map((b) => ({ ...b, date: day.date })));
   const idFor = (b) => `rp-${plan.id}-${b.id}`;
   const isChecked = (b) => !!(routineChecks[b.date] || {})[idFor(b)];
+
+  // logged actual-study minutes for a block, read back from that chapter's activity log
+  const loggedMinutesFor = (b) => {
+    if (!b.subjectId || !b.chapterId) return "";
+    const activities = subjectsData?.[b.subjectId]?.[b.chapterId]?.activities || [];
+    const entry = activities.find((a) => a.blockId === idFor(b));
+    return entry ? String(entry.minutes ?? Math.round((entry.hours || 0) * 60)) : "";
+  };
+  const logMinutesFor = (b, minutes) => {
+    if (!b.subjectId || !b.chapterId) return;
+    const label = `${RP_BLOCK_LABELS[b.type] || b.type}${b.type === "examRevision" && b.examName ? ` (${b.examName})` : ""} · রুটিন প্ল্যান`;
+    upsertRoutineActivity(subjectsData, setChapterData, b.subjectId, b.chapterId, idFor(b), b.date, minutes, label);
+  };
 
   const todayBlocks = schedule.find((d) => d.date === today)?.blocks || [];
   const doneToday = todayBlocks.filter((b) => isChecked(b)).length;
@@ -6987,12 +7024,27 @@ function RoutinePlanDashboard({ plan, routineChecks, mixedExams, toggleCheck, on
             <p className="text-xs mb-2" style={{ color: "var(--faint)" }}>পরবর্তী · {RP_DOW_BN[new Date(nextBlock.date + "T00:00:00").getDay()]} {rpBnDateLabel(nextBlock.date)} — {nextBlock.time} {RP_BLOCK_LABELS[nextBlock.type]}{nextBlock.subjectId ? ` · ${rpChapterLabel(nextBlock.subjectId, nextBlock.chapterId)}` : ""}</p>
           ) : <p className="text-xs mb-2" style={{ color: "var(--faint)" }}>সব শেষ! 🎉</p>}
           <div className="space-y-1.5">
-            {todayBlocks.map((b) => (
-              <label key={b.id} className="flex items-center gap-2 text-xs p-1.5 rounded" style={{ background: "var(--surface)" }}>
-                <input type="checkbox" checked={isChecked(b)} onChange={() => toggleCheck(b.date, idFor(b))} />
-                <span style={{ color: "var(--ink-soft)" }}>{b.time}–{b.endTime} · {RP_BLOCK_LABELS[b.type]}{b.subjectId ? ` · ${rpChapterLabel(b.subjectId, b.chapterId)}` : ""}{b.type === "examRevision" && b.examName ? ` (${b.examName})` : ""}{b.carriedOver ? <span style={{ color: "var(--faint)", fontStyle: "italic" }}> · carried over</span> : null}</span>
-              </label>
-            ))}
+            {todayBlocks.map((b) => {
+              const bWithDate = { ...b, date: today };
+              return (
+                <div key={b.id} className="flex items-center gap-2 text-xs p-1.5 rounded" style={{ background: "var(--surface)" }}>
+                  <label className="flex items-center gap-2 flex-1 min-w-0">
+                    <input type="checkbox" checked={isChecked(b)} onChange={() => toggleCheck(today, idFor(b))} />
+                    <span className="truncate" style={{ color: "var(--ink-soft)" }}>{b.time}–{b.endTime} · {RP_BLOCK_LABELS[b.type]}{b.subjectId ? ` · ${rpChapterLabel(b.subjectId, b.chapterId)}` : ""}{b.type === "examRevision" && b.examName ? ` (${b.examName})` : ""}{b.carriedOver ? <span style={{ color: "var(--faint)", fontStyle: "italic" }}> · carried over</span> : null}</span>
+                  </label>
+                  {b.subjectId && (
+                    <input
+                      type="number" min="0" step="5" placeholder="মিন"
+                      defaultValue={loggedMinutesFor(bWithDate)}
+                      onBlur={(e) => logMinutesFor(bWithDate, e.target.value)}
+                      title="আসলে কত মিনিট পড়েছো"
+                      className="text-xs rounded px-1.5 py-1 flex-shrink-0"
+                      style={{ width: 52, border: "1px solid var(--border)", background: "var(--panel)", color: "var(--ink)" }}
+                    />
+                  )}
+                </div>
+              );
+            })}
             {todayBlocks.length === 0 && <p className="text-xs" style={{ color: "var(--faint)" }}>আজ কিছু শিডিউল করা নেই।</p>}
           </div>
         </div>
@@ -7052,7 +7104,7 @@ function RoutinePlanDashboard({ plan, routineChecks, mixedExams, toggleCheck, on
   );
 }
 
-function RoutineTab({ routinePlans, setRoutinePlans, routineChecks, setRoutineChecks, dark, userName, userPhoto, subjectsData, weekStartDay, track, mixedExams, pendingExamPlanDraft, clearPendingExamPlanDraft }) {
+function RoutineTab({ routinePlans, setRoutinePlans, routineChecks, setRoutineChecks, dark, userName, userPhoto, subjectsData, setChapterData, weekStartDay, track, mixedExams, pendingExamPlanDraft, clearPendingExamPlanDraft }) {
   const [mode, setMode] = useState("list"); // "list" | "wizard" | "dashboard"
   const [draft, setDraft] = useState(null);
   const [activePlanId, setActivePlanId] = useState(null);
@@ -7142,6 +7194,7 @@ function RoutineTab({ routinePlans, setRoutinePlans, routineChecks, setRoutineCh
 
       {mode === "dashboard" && activePlan && (
         <RoutinePlanDashboard plan={activePlan} routineChecks={routineChecks} mixedExams={mixedExams} toggleCheck={toggleCheck}
+          subjectsData={subjectsData} setChapterData={setChapterData}
           onBack={() => { setMode("list"); setActivePlanId(null); }}
           onEdit={() => startEdit(activePlan)}
           onDelete={() => deletePlan(activePlan)} />
@@ -11301,7 +11354,7 @@ function App() {
         ) : tab === "calendar" ? (
           <CalendarTab calendarData={calendarData} setDayData={setDayData} mixedExams={mixedExams} routines={allRoutines} routineChecks={routineChecks} setRoutineChecks={setRoutineChecks} weekStartDay={weekStartDay} dark={dark} userName={userName} userPhoto={userPhoto} />
         ) : tab === "routine" ? (
-          <RoutineTab routinePlans={routinePlans} setRoutinePlans={setRoutinePlans} routineChecks={routineChecks} setRoutineChecks={setRoutineChecks} mixedExams={mixedExams} track={track} dark={dark} userName={userName} userPhoto={userPhoto} subjectsData={subjectsData} weeklyPlans={weeklyPlans} setWeeklyPlans={setWeeklyPlans} weekStartDay={weekStartDay} loaded={loaded} pendingExamPlanDraft={pendingExamPlanDraft} clearPendingExamPlanDraft={() => setPendingExamPlanDraft(null)} />
+          <RoutineTab routinePlans={routinePlans} setRoutinePlans={setRoutinePlans} routineChecks={routineChecks} setRoutineChecks={setRoutineChecks} mixedExams={mixedExams} track={track} dark={dark} userName={userName} userPhoto={userPhoto} subjectsData={subjectsData} setChapterData={setChapterData} weeklyPlans={weeklyPlans} setWeeklyPlans={setWeeklyPlans} weekStartDay={weekStartDay} loaded={loaded} pendingExamPlanDraft={pendingExamPlanDraft} clearPendingExamPlanDraft={() => setPendingExamPlanDraft(null)} />
         ) : tab === "class-routine" ? (
           <ClassRoutineTab routines={routines} setRoutines={setRoutines} routineChecks={routineChecks} setRoutineChecks={setRoutineChecks} mixedExams={mixedExams} calendarData={calendarData} dark={dark} userName={userName} userPhoto={userPhoto} />
         ) : tab === "exams" ? (
