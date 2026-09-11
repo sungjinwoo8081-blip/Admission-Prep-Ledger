@@ -5763,8 +5763,8 @@ function ExamTrendPanel({ mixedExams, comparePeople, dark, userName, userPhoto }
         },
       },
     });
-    setTimeout(() => {
-      downloadExamTrendSnap({ chartCanvas: tempCanvas, dark, userName, userPhoto, label: personalizedSnapLabel(userName, `${t.label} Trend`) });
+    setTimeout(async () => {
+      await downloadExamTrendSnap({ chartCanvas: tempCanvas, dark, userName, userPhoto, label: personalizedSnapLabel(userName, `${t.label} Trend`) });
       tempChart.destroy();
     }, 50);
     setSnapPickerTrackId(null);
@@ -5808,8 +5808,8 @@ function ExamTrendPanel({ mixedExams, comparePeople, dark, userName, userPhoto }
         },
       },
     });
-    setTimeout(() => {
-      downloadExamTrendSnap({ chartCanvas: tempCanvas, dark, userName, userPhoto, label: personalizedSnapLabel(userName, `${t.label} Weekly Trend`) });
+    setTimeout(async () => {
+      await downloadExamTrendSnap({ chartCanvas: tempCanvas, dark, userName, userPhoto, label: personalizedSnapLabel(userName, `${t.label} Weekly Trend`) });
       tempChart.destroy();
     }, 50);
     setSnapPickerWeeklyTrackId(null);
@@ -5837,8 +5837,8 @@ function ExamTrendPanel({ mixedExams, comparePeople, dark, userName, userPhoto }
         },
       },
     });
-    setTimeout(() => {
-      downloadExamTrendSnap({ chartCanvas: tempCanvas, dark, userName, userPhoto, label: personalizedSnapLabel(userName, "Daily Exam Progress") });
+    setTimeout(async () => {
+      await downloadExamTrendSnap({ chartCanvas: tempCanvas, dark, userName, userPhoto, label: personalizedSnapLabel(userName, "Daily Exam Progress") });
       tempChart.destroy();
     }, 50);
   };
